@@ -361,6 +361,63 @@
       margin-bottom: 4px;
     }
 
+    /* Augmented matrix */
+    .matrix-box.augmented td.vert-bar {
+      border-left: 2px solid #1e293b;
+      padding-left: 8px;
+      width: auto;
+      font-weight: 300;
+      color: #94a3b8;
+    }
+    .matrix-box.augmented td.vert-label {
+      width: auto;
+      padding: 0 2px;
+      color: #94a3b8;
+      font-weight: 300;
+    }
+
+    /* Equation step display */
+    .eq-steps { margin: 12px 0; }
+    .eq-step {
+      background: #f8fafc;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      border: 1px solid #eef2ff;
+    }
+    .eq-step-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #e2e8f0;
+    }
+    .eq-step-matrices {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .eq-step-matrices .matrix-block {
+      text-align: center;
+    }
+    .eq-step-matrices .matrix-block .matrix-label {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .eq-step-arrow {
+      font-size: 20px;
+      color: #94a3b8;
+      align-self: center;
+      padding: 0 4px;
+    }
+    @media (max-width: 640px) {
+      .eq-step-matrices { gap: 12px; }
+      .eq-step-matrices .matrix-box td { width: 30px; height: 30px; font-size: 14px; }
+    }
+
     /* Type selector */
     .type-selector {
       display: flex;
@@ -611,18 +668,27 @@ function saveApiKey() {
 // ============================================================
 // 服务器检测
 // ============================================================
+let serverDetectionPromise = null;
+
 async function detectServer() {
   try {
-    const res = await fetch('/api/question', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: 'test' }),
-    });
-    // 能连上（不管返回什么状态）就算有服务器
-    useServer = true;
-    showToast('已连接服务器');
+    const res = await fetch('/api/ping');
+    if (res.ok) {
+      useServer = true;
+      console.log('[Server] 已连接本地服务器');
+    } else {
+      useServer = false;
+    }
   } catch (e) {
     useServer = false;
+    console.log('[Server] 未检测到本地服务器，使用浏览器直连模式');
+  }
+}
+
+// 等待服务器检测完成（给 generateQuestion 调用）
+async function ensureServerDetected() {
+  if (serverDetectionPromise) {
+    await serverDetectionPromise;
   }
 }
 
@@ -647,6 +713,9 @@ let questionStartTime = 0; // 题目开始时间（毫秒时间戳）
 let questionType = 'mixed'; // 'mixed' | 'decimal' | 'fraction' | 'matrix' | 'equation'
 
 async function generateQuestion() {
+  // 等待服务器检测完成
+  await ensureServerDetected();
+
   const apiKey = getApiKey();
   if (!apiKey) {
     showToast('请先在设置页配置 API Key');
@@ -673,6 +742,7 @@ async function generateQuestion() {
         return;
       }
       data = await res.json();
+      console.log('[DEBUG] Server response:', JSON.stringify(data).slice(0, 500));
     } else {
       // 浏览器模式：直接调用 DeepSeek API
       data = await callDeepSeekDirect(apiKey, questionType);
@@ -1130,6 +1200,68 @@ function clientVerifyMatrix(userMatrix, correctMatrix) {
 }
 
 // ============================================================
+// 结构化解题步骤渲染（含左乘矩阵）
+// ============================================================
+function renderStructuredMatrix(matrix) {
+  if (!matrix || !matrix.length) return '';
+  let html = '<div class="matrix-box"><table>';
+  for (let i = 0; i < matrix.length; i++) {
+    html += '<tr>';
+    for (let j = 0; j < matrix[i].length; j++) {
+      html += '<td>' + escapeHtml(matrix[i][j]) + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+function renderAugmentedMatrix(matrix, vector) {
+  if (!matrix || !matrix.length) return '';
+  const n = matrix.length;
+  let html = '<div class="matrix-box augmented"><table>';
+  for (let i = 0; i < n; i++) {
+    html += '<tr>';
+    for (let j = 0; j < n; j++) {
+      html += '<td>' + escapeHtml(matrix[i][j]) + '</td>';
+    }
+    html += '<td class="vert-bar"></td>';
+    html += '<td>' + escapeHtml(vector[i]) + '</td>';
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+function renderEquationSteps(steps) {
+  if (!steps || !steps.length) return '';
+  let html = '<div class="eq-steps">';
+  for (let s = 0; s < steps.length; s++) {
+    const step = steps[s];
+    html += '<div class="eq-step">';
+    html += '<div class="eq-step-header">第 ' + (s + 1) + ' 步: ' + escapeHtml(step.operation) + '</div>';
+    html += '<div class="eq-step-matrices">';
+    if (step.leftMatrix) {
+      html += '<div class="matrix-block">' +
+        '<div class="matrix-label">左乘矩阵</div>' +
+        renderStructuredMatrix(step.leftMatrix) +
+        '</div>';
+    }
+    if (step.augmented) {
+      html += '<div class="eq-step-arrow">→</div>';
+      html += '<div class="matrix-block">' +
+        '<div class="matrix-label">增广矩阵</div>' +
+        renderAugmentedMatrix(step.augmented.matrix, step.augmented.vector) +
+        '</div>';
+    }
+    html += '</div>'; // eq-step-matrices
+    html += '</div>'; // eq-step
+  }
+  html += '</div>';
+  return html;
+}
+
+// ============================================================
 // 方程组渲染
 // ============================================================
 function renderEquationQuestion() {
@@ -1280,11 +1412,19 @@ function displayEquationResult(correct, userAnswer, correctAnswer, vars) {
   });
 
   // solution + 下一题/结束
-  resultArea.innerHTML +=
-    '<div class="solution-box">' +
+  let solutionHtml;
+  if (currentQuestion.solutionSteps) {
+    solutionHtml = '<div class="solution-box">' +
+      '<h3>📖 详细解答（行变换 · 含左乘矩阵）</h3>' +
+      renderEquationSteps(currentQuestion.solutionSteps) +
+    '</div>';
+  } else {
+    solutionHtml = '<div class="solution-box">' +
       '<h3>📖 详细解答（行变换）</h3>' +
       '<div class="step">' + escapeHtml(currentQuestion.solution || '') + '</div>' +
-    '</div>' +
+    '</div>';
+  }
+  resultArea.innerHTML += solutionHtml +
     '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
       '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
       '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
@@ -1747,7 +1887,8 @@ document.addEventListener('DOMContentLoaded', function() {
   showHomeScreen();
 
   updateStats();
-  detectServer();
+  // 在后台启动服务器检测
+  serverDetectionPromise = detectServer();
 });
 </script>
 </body>

@@ -167,6 +167,169 @@ def safe_eval(expr: str) -> Fraction | None:
         return None
 
 
+# === 高斯消元 + 初等矩阵生成 ===
+
+def format_frac(frac):
+    """将 Fraction 格式化为显示字符串"""
+    if frac.denominator == 1:
+        return str(frac.numerator)
+    return f'{frac.numerator}/{frac.denominator}'
+
+
+def make_identity(n):
+    """创建 n×n 单位矩阵（Fraction 类型）"""
+    return [[Fraction(1) if i == j else Fraction(0) for j in range(n)] for i in range(n)]
+
+
+def elementary_swap(n, i, j):
+    """行交换初等矩阵：E·A 交换 A 的第 i 行和第 j 行"""
+    E = make_identity(n)
+    E[i][i] = E[j][j] = Fraction(0)
+    E[i][j] = E[j][i] = Fraction(1)
+    return E
+
+
+def elementary_add(n, i, j, k):
+    """行倍加初等矩阵：E·A 将 A 的第 j 行的 k 倍加到第 i 行（R_i = R_i + k·R_j）"""
+    E = make_identity(n)
+    E[i][j] = k
+    return E
+
+
+def elementary_scale(n, i, k):
+    """行倍乘初等矩阵：E·A 将 A 的第 i 行乘以 k（R_i = k·R_i）"""
+    E = make_identity(n)
+    E[i][i] = k
+    return E
+
+
+def mat_to_json(m):
+    """将 Fraction 矩阵转为 JSON 可序列化的字符串矩阵"""
+    return [[format_frac(m[i][j]) for j in range(len(m[i]))] for i in range(len(m))]
+
+
+def augmented_to_json(aug):
+    """将增广矩阵 [A|b] 拆分为 matrix 和 vector 两个字符串矩阵"""
+    n = len(aug)
+    m = [[format_frac(aug[i][j]) for j in range(len(aug[i]) - 1)] for i in range(n)]
+    v = [format_frac(aug[i][-1]) for i in range(n)]
+    return {'matrix': m, 'vector': v}
+
+
+def operation_text(row, col, factor):
+    """生成行变换操作描述文字"""
+    if factor > 0:
+        factor_str = format_frac(factor)
+        if factor_str == '1':
+            return f'R{row+1} = R{row+1} - R{col+1}'
+        return f'R{row+1} = R{row+1} - {factor_str} × R{col+1}'
+    else:
+        factor_str = format_frac(-factor)
+        if factor_str == '1':
+            return f'R{row+1} = R{row+1} + R{col+1}'
+        return f'R{row+1} = R{row+1} + {factor_str} × R{col+1}'
+
+
+def scale_operation_text(row, k):
+    """生成行倍乘操作描述文字"""
+    return f'R{row+1} = {format_frac(k)} × R{row+1}'
+
+
+def gaussian_elimination_steps(A_int, b_int):
+    """
+    对增广矩阵 [A|b] 执行高斯-约当消元，跟踪每一步的初等矩阵。
+
+    A_int: 整数系数矩阵（list of list of int）
+    b_int: 常数向量（list of int）
+
+    返回: { 'steps': [...], 'solution': {var: value} }
+    每步: { 'operation': str, 'leftMatrix': [[str]], 'augmented': {matrix: [[str]], vector: [str]} }
+    """
+    n = len(A_int)
+
+    # 转为 Fraction 精确计算
+    A = [[Fraction(x) for x in row] for row in A_int]
+    b = [Fraction(x) for x in b_int]
+    aug = [A[i] + [b[i]] for i in range(n)]
+
+    steps = []
+
+    # 第 0 步：初始状态
+    steps.append({
+        'operation': '写出增广矩阵',
+        'leftMatrix': mat_to_json(make_identity(n)),
+        'augmented': augmented_to_json(aug),
+    })
+
+    # 前向消元（化为行阶梯形）
+    for col in range(n):
+        # 寻找主元
+        pivot_row = None
+        for row in range(col, n):
+            if aug[row][col] != 0:
+                pivot_row = row
+                break
+        if pivot_row is None:
+            continue  # 奇异矩阵，跳过（但 AI 已验证解存在）
+
+        # 交换行（如需）
+        if pivot_row != col:
+            E = elementary_swap(n, col, pivot_row)
+            aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
+            steps.append({
+                'operation': f'交换 R{col+1} 和 R{pivot_row+1}',
+                'leftMatrix': mat_to_json(E),
+                'augmented': augmented_to_json(aug),
+            })
+
+        # 消去下方元素
+        pivot = aug[col][col]
+        for row in range(col + 1, n):
+            factor = aug[row][col] / pivot
+            if factor != 0:
+                E = elementary_add(n, row, col, -factor)
+                for k in range(col, n + 1):
+                    aug[row][k] -= factor * aug[col][k]
+                steps.append({
+                    'operation': operation_text(row, col, factor),
+                    'leftMatrix': mat_to_json(E),
+                    'augmented': augmented_to_json(aug),
+                })
+
+    # 后向消元（化为行最简形 RREF）
+    for col in range(n - 1, -1, -1):
+        pivot = aug[col][col]
+        # 归一化主元为 1
+        if pivot != 1 and pivot != 0:
+            inv = Fraction(1) / pivot
+            E = elementary_scale(n, col, inv)
+            for k in range(n + 1):
+                aug[col][k] *= inv
+            steps.append({
+                'operation': scale_operation_text(col, inv),
+                'leftMatrix': mat_to_json(E),
+                'augmented': augmented_to_json(aug),
+            })
+
+        # 消去上方元素
+        for row in range(col):
+            factor = aug[row][col]
+            if factor != 0:
+                E = elementary_add(n, row, col, -factor)
+                for k in range(n + 1):
+                    aug[row][k] -= factor * aug[col][k]
+                steps.append({
+                    'operation': operation_text(row, col, factor),
+                    'leftMatrix': mat_to_json(E),
+                    'augmented': augmented_to_json(aug),
+                })
+
+    # 提取解向量（使用 format_frac 处理可能的非整数解）
+    solution = {f'x{i+1}': format_frac(aug[i][-1]) for i in range(n)}
+
+    return {'steps': steps, 'solution': solution}
+
+
 def validate_result(result: Fraction) -> (bool, str):
     """验证计算结果是否符合约束，返回 (是否合法, 格式化后的答案)"""
     # 检查范围
@@ -501,6 +664,22 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
                 continue
 
             print(f'[equation] 生成成功: {num_vars}元方程组')
+
+            # 使用服务端高斯消元生成解题步骤（包含左乘矩阵）
+            try:
+                elim_result = gaussian_elimination_steps(matrix_a, vector_b)
+                # 变量名标准化：AI 可能用 x,y 或 x,y,z，映射到通用 x1,x2...
+                var_map = {}
+                for i, v in enumerate(variables):
+                    var_map[f'x{i+1}'] = v
+                mapped_steps = []
+                for step in elim_result['steps']:
+                    mapped_steps.append(step)
+                solution_steps = mapped_steps
+            except Exception as e:
+                print(f'[equation] 高斯消元出错: {e}，回退到 AI 生成的文本', file=sys.stderr)
+                solution_steps = None
+
             return {
                 'questionType': 'equation',
                 'question': '解下列线性方程组',
@@ -512,6 +691,7 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
                 'answer': answer,
                 'answerType': 'equation',
                 'solution': solution,
+                'solutionSteps': solution_steps,
             }
 
         # 原有的口算题逻辑
@@ -698,7 +878,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404, 'File not found')
 
     def do_GET(self):
-        if self.path == '/api/stats':
+        if self.path == '/api/ping':
+            self._send_json({'ok': True})
+        elif self.path == '/api/stats':
             stats = load_stats()
             self._send_json(stats)
         elif self.path.split('?')[0] in ('/', '/index.html'):
