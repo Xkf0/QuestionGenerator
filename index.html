@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>艾宾浩斯背单词</title>
+  <title>AI 口算练习</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -15,7 +15,6 @@
       --success-light: #4ADE80;
       --danger: #EF4444;
       --warning: #F59E0B;
-      --orange: #F97316;
       --bg: #f1f5f9;
       --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
       --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.08);
@@ -68,11 +67,11 @@
     /* Stats Bar */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 8px;
       margin: -24px auto 0;
       padding: 0 16px;
-      max-width: 900px;
+      max-width: 600px;
       position: relative;
       z-index: 10;
     }
@@ -102,26 +101,14 @@
       font-weight: 500;
       letter-spacing: 0.3px;
     }
-
-    /* File Bar */
-    .file-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
-      max-width: 800px;
-      margin: 14px auto 0;
-      padding: 0 16px;
-    }
-    .file-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
-    .file-status .file-icon { font-size: 14px; }
-    .file-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .stat-card .num.success { color: var(--success); }
+    .stat-card .num.warning { color: var(--warning); }
+    .stat-card .num.danger { color: var(--danger); }
 
     /* Tabs */
     .tabs {
       display: flex;
-      max-width: 800px;
+      max-width: 600px;
       margin: 14px auto 0;
       padding: 0 16px;
       gap: 2px;
@@ -145,7 +132,7 @@
       color: var(--primary);
       box-shadow: 0 -2px 0 var(--primary);
     }
-    .tab-content { max-width: 800px; margin: 0 auto; padding: 0 16px; }
+    .tab-content { max-width: 600px; margin: 0 auto; padding: 0 16px; }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
 
@@ -159,6 +146,40 @@
       transition: box-shadow 0.2s;
     }
     .card:hover { box-shadow: var(--card-shadow-hover); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(74, 108, 247, 0.35); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #e2e8f0;
+      color: #64748b;
+      box-shadow: none;
+    }
+    .btn-outline:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: #f8faff; }
+    .btn-sm { padding: 6px 14px; font-size: 12px; }
+    .btn-block { width: 100%; }
 
     /* Form */
     .form-group { margin-bottom: 14px; }
@@ -185,193 +206,131 @@
       background: #fff;
     }
 
-    /* Buttons */
-    .btn {
-      display: inline-flex;
+    /* Practice */
+    .question-area { text-align: center; }
+    .question-text {
+      font-size: 32px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 24px 0;
+      padding: 20px;
+      background: #f8faff;
+      border-radius: var(--radius);
+      border: 2px solid #eef2ff;
+      line-height: 1.5;
+      min-height: 80px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      padding: 10px 24px;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .btn:active { transform: scale(0.97); }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-dark); box-shadow: 0 4px 12px rgba(74, 108, 247, 0.35); }
-    .btn-success { background: var(--success); color: #fff; }
-    .btn-success:hover { background: #16a34a; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35); }
-    .btn-danger { background: var(--danger); color: #fff; }
-    .btn-danger:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35); }
-    .btn-warning { background: var(--warning); color: #fff; }
-    .btn-warning:hover { background: #d97706; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35); }
-    .btn-sm { padding: 6px 14px; font-size: 12px; }
-    .btn-outline {
-      background: transparent;
+    .answer-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      margin: 16px 0;
+    }
+    .answer-row input {
+      width: 200px;
+      padding: 12px 16px;
       border: 2px solid #e2e8f0;
-      color: #64748b;
-      box-shadow: none;
-    }
-    .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: #f8faff; }
-    .btn-block { width: 100%; }
-
-    /* Review */
-    .review-empty { text-align: center; padding: 48px 20px; color: #94a3b8; }
-    .review-empty .icon { font-size: 56px; margin-bottom: 16px; display: block; }
-    .review-card {
-      text-align: center;
-      padding: 48px 20px;
-      border: 1px solid #f1f5f9;
-    }
-    .review-card .word { font-size: 40px; font-weight: 800; color: #0f172a; margin-bottom: 8px; letter-spacing: 1px; }
-    .review-card .stage-badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #eff6ff, #dbeafe);
-      color: var(--primary);
-      padding: 3px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 20px;
-      letter-spacing: 0.5px;
-    }
-    .review-card .definition {
-      font-size: 24px;
-      color: var(--success);
-      font-weight: 700;
-      margin: 24px 0;
-      min-height: 36px;
-      padding: 16px;
-      background: #f0fdf4;
       border-radius: var(--radius-sm);
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+      background: #f8fafc;
     }
-    .review-card .hint { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
-    .review-card .btn-group { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-    .review-card .btn-group .btn {
-      min-width: 130px;
-      padding: 12px 28px;
+    .answer-row input:focus {
+      border-color: var(--primary-light);
+      background: #fff;
+    }
+    .answer-row input.correct { border-color: var(--success); background: #f0fdf4; }
+    .answer-row input.wrong { border-color: var(--danger); background: #fef2f2; }
+
+    .result-badge {
+      display: inline-block;
+      padding: 6px 24px;
+      border-radius: 20px;
+      font-size: 16px;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    .result-badge.correct { background: #f0fdf4; color: var(--success); }
+    .result-badge.wrong { background: #fef2f2; color: var(--danger); }
+
+    /* Solution */
+    .solution-box {
+      text-align: left;
+      background: #f8fafc;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin: 16px 0;
+      border-left: 4px solid var(--primary);
+    }
+    .solution-box h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+    .solution-box .step {
+      font-size: 14px;
+      color: #334155;
+      padding: 4px 0;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 40px 0;
+      color: #94a3b8;
       font-size: 15px;
     }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid #e2e8f0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .review-list .review-item {
+    /* History */
+    .history-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .history-body { flex: 1; }
+    .history-body .h-question { font-weight: 600; font-size: 14px; color: #0f172a; }
+    .history-body .h-detail { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .history-body .h-correct { color: var(--success); font-weight: 600; }
+    .history-body .h-wrong { color: var(--danger); font-weight: 600; }
+
+    /* Settings */
+    .card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #0f172a; }
+    .setting-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 8px;
+      padding: 10px 0;
       border-bottom: 1px solid #f1f5f9;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: background 0.15s;
     }
-    .review-list .review-item:hover { background: #f8fafc; }
-    .review-list .review-item:last-child { border-bottom: none; }
-    .review-item .word-info { flex: 1; }
-    .review-item .word-info .word { font-weight: 600; font-size: 15px; color: #0f172a; }
-    .review-item .word-info .meta { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-    .review-item .overdue {
-      font-size: 12px;
-      color: var(--danger);
-      font-weight: 600;
-      white-space: nowrap;
-      margin-left: 12px;
-    }
-
-    /* Word Bank */
-    .filter-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
-    .filter-btn {
-      padding: 6px 18px;
-      border: 2px solid #e2e8f0;
-      border-radius: 20px;
-      background: #fff;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      color: #64748b;
-    }
-    .filter-btn:hover { border-color: var(--primary-light); color: var(--primary); }
-    .filter-btn.active { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
-
-    .word-row {
-      display: flex;
-      align-items: center;
-      padding: 14px 8px;
-      border-bottom: 1px solid #f1f5f9;
-      transition: background 0.15s;
-      border-radius: 6px;
-    }
-    .word-row:hover { background: #f8fafc; }
-    .word-row:last-child { border-bottom: none; }
-    .word-row .col-word { flex: 2; font-weight: 600; color: #0f172a; }
-    .word-row .col-def { flex: 3; color: #64748b; font-size: 14px; }
-    .word-row .col-stage { flex: 2; }
-
-    .stage-bar {
-      height: 6px;
-      background: #f1f5f9;
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .stage-bar .fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--primary), var(--success));
-      border-radius: 3px;
-      transition: width 0.5s ease;
-    }
-    .stage-label { font-size: 11px; color: #94a3b8; margin-top: 3px; }
-    .stage-mastered { color: var(--success); font-weight: 600; }
-
-    .btn-del {
-      background: none;
-      border: none;
-      color: #cbd5e1;
-      font-size: 16px;
-      cursor: pointer;
-      padding: 6px 10px;
-      border-radius: 6px;
-      transition: all 0.2s;
-    }
-    .btn-del:hover { color: var(--danger); background: #fef2f2; }
-
-    .play-btn {
-      cursor: pointer;
-      font-size: 16px;
-      margin-left: 4px;
-      vertical-align: middle;
-      display: inline-block;
-      user-select: none;
-      transition: transform 0.15s;
-    }
-    .play-btn:hover { transform: scale(1.3); }
-    .play-btn:active { transform: scale(0.9); }
-
-    /* Sentence badge */
-    .sentence-badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #fff7ed, #ffedd5);
-      color: var(--orange);
-      padding: 3px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      letter-spacing: 0.5px;
-    }
-    .sentence-item {
-      border-left: 3px solid var(--orange);
-      padding: 12px 12px 12px 16px;
-      margin-bottom: 10px;
-      background: #fffbeb;
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    }
-    .sentence-item .sen-english { font-weight: 600; font-size: 15px; color: #0f172a; }
-    .sentence-item .sen-chinese { font-size: 13px; color: #64748b; margin-top: 3px; }
-    .sentence-item .sen-meta { font-size: 11px; color: #94a3b8; margin-top: 4px; }
-    .review-list .review-item.sentence { border-left: 3px solid var(--orange); }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-row .label { font-size: 14px; color: #475569; }
+    .setting-row .desc { font-size: 12px; color: #94a3b8; margin-top: 2px; }
 
     /* Toast */
     .toast {
@@ -393,24 +352,18 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* Empty State */
+    /* Empty state */
     .empty-state { text-align: center; padding: 48px 20px; color: #94a3b8; }
     .empty-state .icon { font-size: 48px; margin-bottom: 10px; }
     .empty-state p { font-size: 14px; }
 
-    /* Settings page */
-    .card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #0f172a; }
-
     /* Responsive */
     @media (max-width: 640px) {
-      .stats-bar { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 6px; }
       .stat-card { padding: 10px 6px; }
       .stat-card .num { font-size: 20px; }
-      .review-card .word { font-size: 30px; }
-      .review-card .definition { font-size: 20px; padding: 12px; }
-      .review-card { padding: 32px 16px; }
-      .word-row { flex-wrap: wrap; gap: 4px; }
-      .word-row .col-action { flex: 0 0 auto; }
+      .question-text { font-size: 24px; padding: 16px; }
+      .answer-row input { width: 160px; font-size: 18px; }
       .tabs { padding: 0 8px; gap: 1px; }
       .tab-content { padding: 0 8px; }
       .tab-btn { font-size: 13px; padding: 9px 6px; }
@@ -421,1168 +374,601 @@
 <body>
 
 <header>
-  <h1>艾宾浩斯背单词</h1>
-  <p>遵循遗忘曲线规律 · 科学复习</p>
+  <h1>AI <span>口算练习</span></h1>
+  <p>由 AI 生成口算题 · 附带详细解答</p>
 </header>
 
 <!-- Stats -->
 <div class="stats-bar">
   <div class="stat-card">
-    <div class="num" id="statTotal">0</div>
-    <div class="label">总单词</div>
+    <div class="num" id="statToday">0</div>
+    <div class="label">今日已做</div>
   </div>
   <div class="stat-card">
-    <div class="num" id="statDue">0</div>
-    <div class="label">待复习</div>
+    <div class="num success" id="statAccuracy">0%</div>
+    <div class="label">正确率</div>
   </div>
   <div class="stat-card">
-    <div class="num" id="statLearning">0</div>
-    <div class="label">学习中</div>
+    <div class="num warning" id="statStreak">0</div>
+    <div class="label">连续正确</div>
   </div>
   <div class="stat-card">
-    <div class="num" id="statMastered">0</div>
-    <div class="label">年复习中</div>
-  </div>
-  <div class="stat-card">
-    <div class="num" id="statSentenceCount">0</div>
-    <div class="label">句子</div>
-  </div>
-  <div class="stat-card">
-    <div class="num" id="statNextTime" style="font-size:16px;color:#e67e22;">--</div>
-    <div class="label">下次复习</div>
-  </div>
-  <div class="stat-card" style="cursor:pointer;" onclick="toggleSnooze()">
-    <div class="num" id="statAudioStatus" style="font-size:22px;line-height:1.2;" title="点击延时 10 分钟">🔔</div>
-    <div class="label">延时</div>
-  </div>
-</div>
-
-<!-- File Bar -->
-<div class="file-bar">
-  <div class="file-status">
-    <span class="file-icon" id="fileIcon">💾</span>
-    <span class="file-text" id="fileText">正在连接...</span>
-  </div>
-  <div class="file-actions">
-    <button class="btn btn-sm btn-primary" onclick="saveToFile()">保存到文件</button>
-    <button class="btn btn-sm btn-outline" onclick="exportData()">导出备份</button>
-    <button class="btn btn-sm btn-outline" onclick="document.getElementById('importInput').click()">导入</button>
-    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    <div class="num" id="statSpeed">--</div>
+    <div class="label">平均速度</div>
   </div>
 </div>
 
 <!-- Tabs -->
 <div class="tabs">
-  <button class="tab-btn active" data-tab="review">复习</button>
-  <button class="tab-btn" data-tab="add">添加单词</button>
-  <button class="tab-btn" data-tab="bank">单词本</button>
+  <button class="tab-btn active" data-tab="practice">练习</button>
+  <button class="tab-btn" data-tab="history">历史</button>
   <button class="tab-btn" data-tab="settings">设置</button>
 </div>
 
 <!-- Content -->
 <div class="tab-content">
 
-  <!-- Review -->
-  <div class="tab-pane active" id="pane-review">
-    <div id="reviewArea"></div>
+  <!-- Practice -->
+  <div class="tab-pane active" id="pane-practice">
+    <div id="practiceArea"></div>
   </div>
 
-  <!-- Add -->
-  <div class="tab-pane" id="pane-add">
+  <!-- History -->
+  <div class="tab-pane" id="pane-history">
     <div class="card">
-      <div class="form-group">
-        <label for="inputWord">英文单词</label>
-        <input type="text" id="inputWord" placeholder="例如：apple" autocomplete="off">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <h3 style="margin:0;">练习记录</h3>
+        <div>
+          <button class="btn btn-sm btn-outline" onclick="setHistoryFilter('today')" id="filterToday">今天</button>
+          <button class="btn btn-sm btn-primary" onclick="setHistoryFilter('all')" id="filterAll">全部</button>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="inputDef">中文释义</label>
-        <input type="text" id="inputDef" placeholder="例如：苹果" autocomplete="off">
-      </div>
-      <button class="btn btn-primary btn-block" onclick="addWord()">添加单词</button>
-    </div>
-    <div class="card">
-      <h3 style="font-size:14px;margin-bottom:8px;color:#666;">批量添加</h3>
-      <div class="form-group">
-        <label for="inputBatch">每行一个：单词,释义</label>
-        <textarea id="inputBatch" rows="5" style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;resize:vertical;outline:none;font-family:inherit;" placeholder="apple,苹果&#10;banana,香蕉&#10;cat,猫"></textarea>
-      </div>
-      <button class="btn btn-primary btn-block" onclick="addBatch()">批量添加</button>
-    </div>
-  </div>
-
-  <!-- Bank -->
-  <div class="tab-pane" id="pane-bank">
-    <div class="card">
-      <div class="filter-bar">
-        <button class="filter-btn active" data-filter="all">全部</button>
-        <button class="filter-btn" data-filter="learning">学习中</button>
-        <button class="filter-btn" data-filter="mastered">年复习中</button>
-        <button class="filter-btn" data-filter="sentence">句子</button>
-      </div>
-      <div id="wordList"></div>
-      <div id="sentenceList" style="margin-top:16px;border-top:1px solid #f0f0f0;padding-top:12px;display:none;"></div>
+      <div id="historyList"></div>
     </div>
   </div>
 
   <!-- Settings -->
   <div class="tab-pane" id="pane-settings">
     <div class="card">
-      <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">数据存储</h3>
-      <div style="background:#f6f8fa;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;">
-        <div style="margin-bottom:4px;"><strong>模式：</strong><span id="modeDisplay">检测中...</span></div>
-        <div style="margin-bottom:4px;"><strong>单词数：</strong><span id="fileDetailCount">0</span></div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="saveToFile()">保存到 vocabulary-data.json</button>
-        <button class="btn btn-warning" onclick="exportData()">导出备份</button>
-        <button class="btn btn-danger" onclick="document.getElementById('importInput').click()">导入恢复</button>
-      </div>
-    </div>
-    <div class="card">
-      <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">AI 设置</h3>
-      <div style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.6;">
-        每积累 10 个单词，AI 自动生成句子用于复习。需要配置 DeepSeek API Key。
-      </div>
+      <h3>AI 配置</h3>
       <div class="form-group">
         <label for="apiKeyInput">DeepSeek API Key</label>
-        <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off" style="font-family:monospace;">
+        <input type="password" id="apiKeyInput" placeholder="sk-..." autocomplete="off">
       </div>
-      <button class="btn btn-primary" onclick="saveApiKey()">保存 API Key</button>
-      <button class="btn btn-outline" onclick="document.getElementById('apiKeyInput').value='';localStorage.removeItem('ebbinghaus_api_key');showToast('已清除 API Key');" style="margin-left:8px;">清除</button>
+      <button class="btn btn-primary btn-block" onclick="saveApiKey()">保存 API Key</button>
     </div>
+
     <div class="card">
-      <h3 style="font-size:16px;font-weight:600;margin-bottom:12px;">如何使用</h3>
-      <div style="font-size:13px;color:#666;line-height:1.8;">
-        <div style="background:#e8f4fd;border-radius:8px;padding:12px;margin-bottom:12px;">
-          <p style="font-weight:600;margin-bottom:4px;">方法一：双击「启动.bat」（推荐）</p>
-          <ol style="padding-left:20px;">
-            <li>在文件夹中找到并双击 <code>启动.bat</code></li>
-            <li>浏览器会自动打开，开始背单词吧！</li>
-            <li>数据会自动保存到 <code>vocabulary-data.json</code> 文件</li>
-          </ol>
+      <h3>数据管理</h3>
+      <div class="setting-row">
+        <div>
+          <div class="label">清空练习记录</div>
+          <div class="desc">删除所有历史题目和统计数据</div>
         </div>
-        <div style="background:#f6f8fa;border-radius:8px;padding:12px;margin-bottom:12px;">
-          <p style="font-weight:600;margin-bottom:4px;">方法二：直接双击 index.html</p>
-          <ol style="padding-left:20px;">
-            <li>在文件夹中找到并双击 <code>index.html</code></li>
-            <li>数据保存在浏览器中（关闭网页再打开，数据不会丢）</li>
-            <li>建议定期点击上面的「保存到文件」手动备份</li>
-          </ol>
+        <button class="btn btn-sm btn-danger" onclick="clearHistory()">清空</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="label">导出数据</div>
+          <div class="desc">将练习记录导出为 JSON 文件</div>
         </div>
+        <button class="btn btn-sm btn-primary" onclick="exportData()">导出</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="label">导入数据</div>
+          <div class="desc">从 JSON 文件恢复练习记录</div>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('importInput').click()">导入</button>
+        <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>关于</h3>
+      <div style="font-size:13px;color:#64748b;line-height:2;">
+        <p>AI 口算练习 v1.0</p>
+        <p>由 AI 生成自定义口算题，附带详细解题步骤。</p>
+        <p>题目支持：整数、小数、分数、四则混合运算。</p>
+        <p>数据保存在浏览器本地，可导出备份。</p>
       </div>
     </div>
   </div>
 
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ============================================================
 // 配置
 // ============================================================
-const STORAGE_KEY = 'ebbinghaus_words';
-const INTERVALS = [
-  20 * 60 * 1000,          // 第 1 次: 20 分钟
-  1 * 60 * 60 * 1000,      // 第 2 次: 1 小时
-  4 * 60 * 60 * 1000,      // 第 3 次: 4 小时
-  8 * 60 * 60 * 1000,      // 第 4 次: 8 小时
-  24 * 60 * 60 * 1000,     // 第 5 次: 1 天
-  3 * 24 * 60 * 60 * 1000, // 第 6 次: 3 天
-  7 * 24 * 60 * 60 * 1000, // 第 7 次: 7 天
-  14 * 24 * 60 * 60 * 1000,// 第 8 次: 14 天
-  30 * 24 * 60 * 60 * 1000,// 第 9 次: 1 个月
-  60 * 24 * 60 * 60 * 1000,// 第10次: 2 个月
-  120 * 24 * 60 * 60 * 1000,// 第11次: 4 个月
-  240 * 24 * 60 * 60 * 1000,// 第12次: 8 个月
-  365 * 24 * 60 * 60 * 1000,// 第13次: 1 年
-];
-const TOTAL_STAGES = INTERVALS.length;
-const YEARLY_INTERVAL = 365 * 24 * 60 * 60 * 1000; // 年复习间隔
-const SENTENCE_KEY = 'ebbinghaus_sentences';
+const STORAGE_KEY = 'math_records';
+const API_KEY_KEY = 'math_api_key';
 
 // ============================================================
-// 数据层：服务器 + localStorage 双写
+// 数据层
 // ============================================================
 let useServer = false;
 
-// 页面加载时检测 server.py 是否在运行
+function loadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch { return []; }
+}
+
+function saveRecords(records) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function getApiKey() {
+  return localStorage.getItem(API_KEY_KEY) || '';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) { showToast('请输入 API Key'); return; }
+  localStorage.setItem(API_KEY_KEY, key);
+  showToast('API Key 已保存');
+}
+
+// ============================================================
+// 服务器检测
+// ============================================================
 async function detectServer() {
-  const textEl = document.getElementById('fileText');
-  const iconEl = document.getElementById('fileIcon');
-  const modeEl = document.getElementById('modeDisplay');
-  const cntEl = document.getElementById('fileDetailCount');
-
   try {
-    const res = await fetch('/api/words', { method: 'GET', cache: 'no-store' });
-    if (res.ok) {
+    const res = await fetch('/api/question', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: 'test' }),
+    });
+    // 能连上就算有服务器（即使返回 400 也说明服务器在运行）
+    if (res.status === 400 || res.ok) {
       useServer = true;
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        // 旧格式：纯单词数组
-        if (data.length > 0) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        }
-      } else if (data && data.words) {
-        // 新格式：{words, sentences}
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.words || []));
-        if (data.sentences) {
-          localStorage.setItem(SENTENCE_KEY, JSON.stringify(data.sentences));
-        }
-      }
-      if (textEl) textEl.textContent = '已连接服务器, 数据自动保存到 vocabulary-data.json';
-      if (iconEl) iconEl.textContent = '\u{1F7E2}';
-      if (modeEl) { modeEl.textContent = '服务器模式 (自动读写 vocabulary-data.json)'; modeEl.style.color = '#52C41A'; }
-      refreshAll();
-      return;
+      showToast('已连接服务器');
     }
-  } catch (e) { /* 服务器未启动 */ }
-  useServer = false;
-  if (textEl) textEl.textContent = '浏览器模式（数据保存在浏览器中）';
-  if (iconEl) iconEl.textContent = '\u{1F7E1}';
-  if (modeEl) { modeEl.textContent = '浏览器模式（数据保存在浏览器中）'; modeEl.style.color = '#FAAD14'; }
-  if (cntEl) {
-    var w = loadWords();
-    var s = loadSentences();
-    cntEl.textContent = w.length + ' 个单词, ' + s.length + ' 个句子';
+  } catch (e) {
+    useServer = false;
   }
-  refreshAll();
-}
-
-function loadWords() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-// 保存到 localStorage + 后台同步到服务器文件
-function saveWords(words) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-  syncToServer();
-}
-
-function loadSentences() {
-  try {
-    const raw = localStorage.getItem(SENTENCE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function saveSentences(sentences) {
-  localStorage.setItem(SENTENCE_KEY, JSON.stringify(sentences));
-  syncToServer();
-}
-
-// 同时保存单词和句子（用于导入恢复等场景）
-function saveData(words, sentences) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-  localStorage.setItem(SENTENCE_KEY, JSON.stringify(sentences));
-  syncToServer();
-}
-
-// 以 {words, sentences} 格式同步到服务器
-function syncToServer() {
-  if (!useServer) return;
-  var words = loadWords();
-  var sentences = loadSentences();
-  fetch('/api/words', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ words: words, sentences: sentences }),
-  }).catch(function() {});
 }
 
 // ============================================================
 // Toast
 // ============================================================
-var toastTimer = null;
+let toastTimer = null;
 function showToast(msg) {
-  var el = document.getElementById('toast');
+  const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2000);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
 }
 
 // ============================================================
-// AI 设置
+// 核心：生成题目
 // ============================================================
-function saveApiKey() {
-  var key = document.getElementById('apiKeyInput').value.trim();
-  if (!key) { showToast('请输入 API Key'); return; }
-  localStorage.setItem('ebbinghaus_api_key', key);
-  showToast('API Key 已保存');
-}
+let currentQuestion = null; // { question, expression, answer, answerType, solution }
+let answered = false;
+let questionStartTime = 0; // 题目开始时间（毫秒时间戳）
 
-function getApiKey() {
-  return localStorage.getItem('ebbinghaus_api_key') || '';
-}
-
-// ============================================================
-// 添加单词
-// ============================================================
-
-// 从免费词典 API 获取音标和音频 URL
-async function fetchPhonetic(word) {
-  try {
-    var res = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
-    if (res.ok) {
-      var data = await res.json();
-      if (data && data[0]) {
-        var phonetic = '';
-        var audioUrl = '';
-        // 优先用顶层的 phonetic 字段
-        if (data[0].phonetic) phonetic = data[0].phonetic;
-        // 从 phonetics 数组里获取音标和音频
-        if (data[0].phonetics) {
-          for (var i = 0; i < data[0].phonetics.length; i++) {
-            var p = data[0].phonetics[i];
-            if (!phonetic && p.text) phonetic = p.text;
-            if (!audioUrl && p.audio) audioUrl = p.audio;
-            if (phonetic && audioUrl) break;
-          }
-        }
-        return { phonetic: phonetic, audioUrl: audioUrl };
-      }
-    }
-  } catch (e) { /* 网络错误，静默处理 */ }
-  return { phonetic: '', audioUrl: '' };
-}
-
-// 每满 10 个单词触发 AI 句子生成（fire-and-forget）
-async function triggerSentenceGeneration(allWords) {
-  var apiKey = getApiKey();
-  if (!apiKey) return;
-
-  var sentences = loadSentences();
-  var count = allWords.length;
-  var startIdx = Math.max(0, count - 10);
-  var last10 = allWords.slice(startIdx, count);
-  var wordRange = (startIdx + 1) + '-' + count;
-
-  // 检查这个范围的句子是否已存在
-  var exists = sentences.some(function(s) { return s.wordRange === wordRange; });
-  if (exists) return;
-
-  showToast('正在用 AI 生成句子 ' + wordRange + '...');
-  var result = await generateSentence(last10);
-  if (!result) {
-    showToast('AI 生成句子失败，可检查 API Key 是否正确');
-    return;
-  }
-
-  var now = new Date();
-  var sentence = {
-    id: Date.now() + Math.random(),
-    wordIds: last10.map(function(w) { return w.id; }),
-    wordRange: wordRange,
-    english: result.english,
-    chinese: result.chinese,
-    stage: 0,
-    createdAt: now.toISOString(),
-    nextReviewAt: new Date(now.getTime() + INTERVALS[0]).toISOString(),
-    reviewedAt: [],
-    forgottenCount: 0,
-  };
-  sentences.push(sentence);
-  saveSentences(sentences);
-  showToast('句子 ' + wordRange + ' 已生成并加入复习');
-  refreshAll();
-}
-
-// 检查所有已完成的 10 词分组，为缺少句子的分组生成句子
-async function generateMissingSentences() {
-  var apiKey = getApiKey();
+async function generateQuestion() {
+  const apiKey = getApiKey();
   if (!apiKey) {
-    // 还没配置 API Key，提示用户去设置页配置
-    if (loadWords().length >= 10) {
-      showToast('请在设置页配置 DeepSeek API Key 以启用 AI 造句');
-    }
+    showToast('请先在设置页配置 API Key');
     return;
   }
 
-  var words = loadWords();
-  var sentences = loadSentences();
-  var groups = Math.floor(words.length / 10);
-
-  for (var g = 1; g <= groups; g++) {
-    var target = g * 10;
-    var range = (target - 9) + '-' + target;
-    var exists = sentences.some(function(s) { return s.wordRange === range; });
-    if (!exists) {
-      await triggerSentenceGeneration(words.slice(0, target));
-      return; // 一次只生成一个，避免并发
-    }
-  }
-}
-
-// 调用 DeepSeek API 生成句子
-async function generateSentence(words) {
-  var apiKey = getApiKey();
-  if (!apiKey) return null;
-
-  var wordList = words.map(function(w) { return w.word; }).join(', ');
-  var prompt = '用以下单词组成一个通顺地道的英文句子（难度适中），并给出中文翻译。\n'
-    + '单词：' + wordList + '\n'
-    + '格式要求：先输出英文句子，然后换行，再输出中文翻译。不要包含其他内容。';
+  const area = document.getElementById('practiceArea');
+  area.innerHTML = '<div class="loading"><div class="spinner"></div>AI 正在出题...</div>';
 
   try {
-    var res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.8,
-        max_tokens: 500,
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn('DeepSeek API 返回错误:', res.status);
-      return null;
-    }
-
-    var data = await res.json();
-    var content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    if (!content) return null;
-
-    // 解析返回内容：第一行英文，其余中文
-    var lines = content.trim().split('\n').filter(function(l) { return l.trim(); });
-    var english = lines[0] ? lines[0].trim() : '';
-    var chinese = lines.slice(1).join('\n').trim();
-
-    if (!english) return null;
-    return { english: english, chinese: chinese || '' };
-  } catch (e) {
-    console.warn('调用 DeepSeek API 失败:', e);
-    return null;
-  }
-}
-
-async function addWord() {
-  var wordEl = document.getElementById('inputWord');
-  var defEl = document.getElementById('inputDef');
-  var word = wordEl.value.trim();
-  var def = defEl.value.trim();
-  if (!word || !def) { showToast('请填写单词和释义'); return; }
-  var words = loadWords();
-  var existing = words.find(function(w) { return w.word.toLowerCase() === word.toLowerCase(); });
-  if (existing) {
-    var stageText = existing.stage >= TOTAL_STAGES
-      ? '年复习 (第' + (existing.stage + 1) + '次)'
-      : '复习 ' + (existing.stage + 1) + '/' + TOTAL_STAGES;
-    var msg = '单词 "' + existing.word + '" 已存在：\n'
-      + '当前释义：' + existing.definition + '\n'
-      + '进度：' + stageText + '\n'
-      + (existing.phonetic ? '音标：' + existing.phonetic + '\n' : '')
-      + '\n是否将新释义 "' + def + '" 追加到已有释义中？';
-    if (confirm(msg)) {
-      existing.definition = existing.definition + '；' + def;
-      existing.stage = 0;
-      existing.nextReviewAt = new Date(Date.now() + INTERVALS[0]).toISOString();
-      existing.forgottenCount = 0;
-      saveWords(words);
-      wordEl.value = '';
-      defEl.value = '';
-      wordEl.focus();
-      showToast('已追加释义，并从 20 分钟后重新开始');
-      refreshAll();
-    }
-    return;
-  }
-  var btn = document.querySelector('#pane-add .btn-block');
-  var originalText = btn.textContent;
-  btn.textContent = '查询音标中...';
-  btn.disabled = true;
-
-  var now = new Date();
-  var result = await fetchPhonetic(word);
-  var phonetic = result.phonetic;
-  var audioUrl = result.audioUrl;
-  var newWord = {
-    id: Date.now() + Math.random(),
-    word: word,
-    definition: def,
-    phonetic: phonetic,
-    audioUrl: audioUrl,
-    stage: 0,
-    createdAt: now.toISOString(),
-    nextReviewAt: new Date(now.getTime() + INTERVALS[0]).toISOString(),
-    reviewedAt: [],
-    forgottenCount: 0,
-  };
-  words.push(newWord);
-  saveWords(words);
-  wordEl.value = '';
-  defEl.value = '';
-  wordEl.focus();
-  btn.textContent = originalText;
-  btn.disabled = false;
-  showToast(phonetic ? '添加成功  ' + phonetic : '添加成功（未找到音标）');
-  refreshAll();
-  // 检查是否有已完成但缺少句子的 10 词分组（兼容从文件/批量导入的场景）
-  await generateMissingSentences();
-}
-
-async function addBatch() {
-  var text = document.getElementById('inputBatch').value.trim();
-  if (!text) { showToast('请填写要批量添加的内容'); return; }
-  var lines = text.split('\n').filter(function(l) { return l.trim(); });
-  var words = loadWords();
-  var added = 0;
-  var now = new Date();
-  // 批量添加时逐个查询音标（异步不阻塞）
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    var sep = line.indexOf(',') >= 0 ? ',' : '\t';
-    var parts = line.split(sep);
-    if (parts.length < 2) continue;
-    var w = parts[0].trim();
-    var d = parts.slice(1).join(sep).trim();
-    if (!w || !d) continue;
-    var existWord = words.find(function(ww) { return ww.word.toLowerCase() === w.toLowerCase(); });
-    if (existWord) {
-      // 重复单词：追加释义并重置记忆进度
-      if (existWord.definition.indexOf(d) === -1) {
-        existWord.definition = existWord.definition + '；' + d;
-      }
-      existWord.stage = 0;
-      existWord.nextReviewAt = new Date(Date.now() + INTERVALS[0]).toISOString();
-      existWord.forgottenCount = 0;
-      continue;
-    }
-    var result2 = await fetchPhonetic(w);
-    words.push({
-      id: Date.now() + Math.random(),
-      word: w,
-      definition: d,
-      phonetic: result2.phonetic,
-      audioUrl: result2.audioUrl,
-      stage: 0,
-      createdAt: now.toISOString(),
-      nextReviewAt: new Date(now.getTime() + INTERVALS[0]).toISOString(),
-      reviewedAt: [],
-      forgottenCount: 0,
-    });
-    added++;
-  }
-  if (added === 0) { showToast('没有新单词可添加'); return; }
-  saveWords(words);
-  document.getElementById('inputBatch').value = '';
-  showToast('成功添加 ' + added + ' 个单词');
-  refreshAll();
-  // 检查所有已完成但缺少句子的 10 词分组
-  await generateMissingSentences();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('inputWord').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      var defEl = document.getElementById('inputDef');
-      if (document.activeElement === document.getElementById('inputWord')) {
-        e.preventDefault();
-        defEl.focus();
-      }
-    }
-  });
-  document.getElementById('inputDef').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addWord(); }
-  });
-});
-
-// ============================================================
-// 复习
-// ============================================================
-var currentReviewId = null;
-var currentReviewType = 'word'; // 'word' or 'sentence'
-var answerRevealed = false;
-var lastAlarmTime = 0;
-var snoozeUntil = 0; // 延时截止时间戳，0 表示未延时
-
-// ============================================================
-// 提醒系统：通知 + 音频 + 震动
-// ============================================================
-
-// --- 音频解锁系统 ---
-// Chrome 要求用户与页面交互后 AudioContext 才能输出声音。
-// 此系统持有一个永久 AudioContext，持续尝试唤醒它，
-// 一旦用户正常使用页面（点击、按键等），音频立即解锁。
-
-var alarmCtx = null;
-var audioUnlocked = false;
-
-(function initAlarmAudio() {
-  try {
-    alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
-    setInterval(function() {
-      if (alarmCtx && alarmCtx.state === 'suspended') {
-        alarmCtx.resume().then(function() {
-          audioUnlocked = true;
-          updateSnoozeBtn();
-        }, function() {});
-      }
-    }, 200);
-  } catch(e) {}
-})();
-
-function onUserTap() {
-  if (!alarmCtx || audioUnlocked) return;
-  if (alarmCtx.state === 'suspended') {
-    alarmCtx.resume().then(function() {
-      audioUnlocked = true;
-      updateSnoozeBtn();
-    }, function() {});
-  }
-}
-document.addEventListener('click', onUserTap);
-document.addEventListener('keydown', onUserTap);
-document.addEventListener('touchstart', onUserTap);
-
-// --- 延时按钮（点击后 5 分钟内不提醒）---
-
-function toggleSnooze() {
-  if (snoozeUntil > Date.now()) {
-    // 正在延时中 → 取消延时
-    snoozeUntil = 0;
-    showToast('已取消延时，恢复提醒');
-  } else {
-    // 开启 5 分钟延时
-    snoozeUntil = Date.now() + 10 * 60 * 1000;
-    showToast('已延时 10 分钟，到时自动恢复提醒');
-  }
-  updateSnoozeBtn();
-}
-
-function updateSnoozeBtn() {
-  var el = document.getElementById('statAudioStatus');
-  if (!el) return;
-  var remaining = snoozeUntil - Date.now();
-  if (remaining > 0) {
-    // 延时中：显示倒计时
-    var secs = Math.ceil(remaining / 1000);
-    var m = Math.floor(secs / 60);
-    var s = secs % 60;
-    el.textContent = '\u23F0 ' + m + ':' + (s < 10 ? '0' : '') + s;
-    el.style.fontSize = '18px';
-    el.style.color = '#EF4444';
-    el.title = '点击取消延时';
-  } else {
-    snoozeUntil = 0; // 清理过期
-    // 正常状态：显示音频状态
-    el.textContent = audioUnlocked ? '\uD83D\uDD14' : '\uD83D\uDD14';
-    el.style.fontSize = '22px';
-    el.style.color = audioUnlocked ? '#22C55E' : '#94a3b8';
-    el.title = '点击延时 5 分钟';
-  }
-}
-
-// 每 5 秒刷新一次延时按钮的显示
-setInterval(updateSnoozeBtn, 5000);
-
-// --- 通知 ---
-
-function requestNotifyPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
-}
-
-function showDueNotification(dueCount) {
-  if (!('Notification' in window)) return;
-  if (Notification.permission !== 'granted') return;
-  try {
-    var n = new Notification('艾宾浩斯背单词', {
-      body: '有 ' + dueCount + ' 项内容需要复习！',
-      tag: 'ebbinghaus-due',
-      requireInteraction: true,
-    });
-    n.onclick = function() {
-      window.focus();
-      this.close();
-    };
-  } catch(e) {}
-}
-
-// --- 播放闹铃音频 ---
-
-function playReviewAlarm() {
-  if (!alarmCtx || !audioUnlocked) return;
-  try {
-    var t = alarmCtx.currentTime + 0.1;
-    var ringCount = 4;
-    for (var r = 0; r < ringCount; r++) {
-      var start = t + r * 0.7;
-      [880, 1320].forEach(function(freq) {
-        var osc = alarmCtx.createOscillator();
-        var gain = alarmCtx.createGain();
-        osc.type = 'square';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.12, start + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
-        osc.connect(gain);
-        gain.connect(alarmCtx.destination);
-        osc.start(start);
-        osc.stop(start + 0.4);
+    let data;
+    if (useServer) {
+      const res = await fetch('/api/question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        area.innerHTML = '<div class="card" style="text-align:center;padding:40px;">' +
+          '<div style="font-size:40px;margin-bottom:12px;">😅</div>' +
+          '<p style="color:#EF4444;font-weight:600;">' + (err.error || '生成失败') + '</p>' +
+          '<button class="btn btn-primary" style="margin-top:16px;" onclick="generateQuestion()">重试</button></div>';
+        return;
+      }
+      data = await res.json();
+    } else {
+      // 浏览器模式：直接调用 DeepSeek API
+      data = await callDeepSeekDirect(apiKey);
     }
-  } catch(e) {}
-}
 
-// --- 快速闹铃检测器（每秒检测一次）---
-
-var alarmCheckerId = null;
-function startAlarmChecker() {
-  if (alarmCheckerId) return;
-  alarmCheckerId = setInterval(function() {
-    // 延时中不提醒
-    if (snoozeUntil > Date.now()) {
-      updateSnoozeBtn();
+    if (!data || data.error) {
+      area.innerHTML = '<div class="card" style="text-align:center;padding:40px;">' +
+        '<div style="font-size:40px;margin-bottom:12px;">😅</div>' +
+        '<p style="color:#EF4444;font-weight:600;">' + (data?.error || '生成失败，请重试') + '</p>' +
+        '<button class="btn btn-primary" style="margin-top:16px;" onclick="generateQuestion()">重试</button></div>';
       return;
     }
 
-    var words = loadWords();
-    var sentences = loadSentences();
-    var now = new Date();
-
-    var dueCount = 0;
-    for (var i = 0; i < words.length; i++) {
-      if (words[i].nextReviewAt && new Date(words[i].nextReviewAt) <= now) dueCount++;
-    }
-    for (var i = 0; i < sentences.length; i++) {
-      if (sentences[i].nextReviewAt && new Date(sentences[i].nextReviewAt) <= now) dueCount++;
-    }
-
-    if (dueCount > 0 && Date.now() - lastAlarmTime > 10 * 1000) {
-      lastAlarmTime = Date.now();
-      playReviewAlarm();
-      showDueNotification(dueCount);
-      try { navigator.vibrate && navigator.vibrate([500, 200, 500, 200, 500]); } catch(e){}
-    }
-  }, 1000);
+    currentQuestion = data;
+    answered = false;
+    questionStartTime = Date.now();
+    renderQuestion();
+  } catch (e) {
+    area.innerHTML = '<div class="card" style="text-align:center;padding:40px;">' +
+      '<div style="font-size:40px;margin-bottom:12px;">😅</div>' +
+      '<p style="color:#EF4444;font-weight:600;">网络错误，请检查网络连接</p>' +
+      '<button class="btn btn-primary" style="margin-top:16px;" onclick="generateQuestion()">重试</button></div>';
+  }
 }
 
-function renderReview() {
-  var area = document.getElementById('reviewArea');
-  var words = loadWords();
-  var sentences = loadSentences();
-  var now = new Date();
+// 浏览器模式直接调用 DeepSeek
+async function callDeepSeekDirect(apiKey) {
+  const prompt = `你是一个口算题生成器。请生成一道符合以下全部约束的口算题：
 
-  // 合并待复习的单词和句子
-  var dueWords = words.filter(function(w) {
-    return w.nextReviewAt && new Date(w.nextReviewAt) <= now;
-  }).map(function(w) { w._type = 'word'; return w; });
+数字约束：
+- 题目中出现的每个数字最多2位（包括整数部分和小数部分）
+- 例如允许：5, 63, 13.2, 23, 23.3, 32/3, 32/63
+- 例如不允许：123, 1.234, 123/456
 
-  var dueSentences = sentences.filter(function(s) {
-    return s.nextReviewAt && new Date(s.nextReviewAt) <= now;
-  }).map(function(s) { s._type = 'sentence'; return s; });
+运算约束：
+- 最多2个加法(+)、2个减法(-)、2个乘法(×)、2个除法(÷)
+- 可以使用括号改变运算顺序
+- 运算符总数不超过8个
 
-  var dueItems = dueWords.concat(dueSentences);
-  dueItems.sort(function(a, b) { return new Date(a.nextReviewAt) - new Date(b.nextReviewAt); });
+结果约束：
+- 计算结果必须在 -1000 到 1000 之间
+- 如果是小数，小数点后最多3位
+- 如果是分数，分子和分母各自最多3位数字
 
-  if (currentReviewId && !dueItems.some(function(item) { return item.id === currentReviewId && item._type === currentReviewType; })) {
-    currentReviewId = null;
-    answerRevealed = false;
+类型一致性（重要！）：
+- 题目中不能同时出现小数和分数，只能选择一种
+- 如果题目中有分数（如 2/3），答案必须用最简分数表示（如 1/2 而非 2/4）
+- 如果题目中有小数（如 1.5），答案必须用小数表示
+- 如果题目中只有整数，答案用整数表示
+
+请严格按以下 JSON 格式返回，不要包含其他内容：
+{
+  "question": "题目文本（用 × 和 ÷ 符号）",
+  "expression": "可用于 Python eval 的表达式（用 * 和 /）",
+  "answer": "标准答案（如 68 或 697/63 或 23.456）",
+  "answerType": "integer | decimal | fraction",
+  "solution": "详细的解题步骤，用中文，分步说明，每步单独一行"
+}`;
+
+  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1000,
+    }),
+  });
+
+  if (!res.ok) {
+    return { error: 'API 返回 ' + res.status + '，请检查 API Key' };
   }
 
-  var totalItems = words.length + sentences.length;
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) return { error: 'AI 返回为空' };
 
-  if (dueItems.length === 0) {
-    if (totalItems === 0) {
-      area.innerHTML = '<div class="card review-empty"><div class="icon">\u{1F4DA}</div><p style="font-size:16px;font-weight:600;color:#333;">还没有内容</p><p style="font-size:13px;margin-top:4px;">前往添加单词开始吧</p></div>';
-    } else {
-      var nextTime = findNextReviewTime(now);
-      var nextHtml = '';
-      if (nextTime) {
-        var diff = nextTime - now;
-        var inText = diff < 60000 ? '不到 1 分钟' : formatDuration(diff) + '后';
-        nextHtml = '<div style="margin-top:16px;padding:16px;background:#fff3e0;border-radius:10px;display:inline-block;">' +
-          '<div style="font-size:13px;color:#e67e22;">下一次复习时间</div>' +
-          '<div style="font-size:28px;font-weight:700;color:#e67e22;margin-top:4px;">' + formatTime(nextTime) + '</div>' +
-          '<div style="font-size:12px;color:#999;margin-top:4px;">约 ' + inText + '</div>' +
-          '</div>';
+  // 解析 JSON
+  let json;
+  if (content.startsWith('{')) {
+    try { json = JSON.parse(content); } catch (e) {}
+  }
+  if (!json) {
+    const m = content.match(/```(?:json)?\s*\n?(.*?)\n?```/s);
+    if (m) {
+      try { json = JSON.parse(m[1].trim()); } catch (e) {}
+    }
+  }
+  if (!json || !json.question || !json.expression) {
+    return { error: 'AI 返回格式错误，请重试' };
+  }
+  return json;
+}
+
+function renderQuestion() {
+  if (!currentQuestion) return;
+  const area = document.getElementById('practiceArea');
+
+  area.innerHTML =
+    '<div class="card question-area">' +
+      '<div class="question-text">' + escapeHtml(currentQuestion.question) + '</div>' +
+      '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">输入你的答案，然后点击提交</div>' +
+      '<div class="answer-row">' +
+        '<input type="text" id="answerInput" placeholder="?" autocomplete="off" onkeydown="if(event.key===\'Enter\')submitAnswer()">' +
+        '<button class="btn btn-success" id="submitBtn" onclick="submitAnswer()">提交</button>' +
+      '</div>' +
+      '<div id="resultArea"></div>' +
+    '</div>';
+
+  document.getElementById('answerInput').focus();
+}
+
+// ============================================================
+// 核验答案
+// ============================================================
+async function submitAnswer() {
+  if (!currentQuestion || answered) return;
+  const input = document.getElementById('answerInput');
+  const userAnswer = input.value.trim();
+  if (!userAnswer) { showToast('请输入答案'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '核验中...';
+
+  let correct = false;
+  let exactAnswer = currentQuestion.answer;
+
+  if (useServer) {
+    // 服务器模式：用 Python Fraction 精确计算
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expression: currentQuestion.expression,
+          userAnswer: userAnswer,
+        }),
+      });
+      const data = await res.json();
+      correct = data.correct;
+      if (data.exactAnswer) exactAnswer = data.exactAnswer;
+    } catch (e) {
+      // 降级到客户端验证
+      correct = clientVerify(userAnswer, currentQuestion.answer, currentQuestion.expression);
+    }
+  } else {
+    correct = clientVerify(userAnswer, currentQuestion.answer, currentQuestion.expression);
+  }
+
+  answered = true;
+
+  // 计算用时（秒）
+  const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
+
+  // 保存记录
+  const records = loadRecords();
+  records.push({
+    id: Date.now() + Math.random(),
+    question: currentQuestion.question,
+    expression: currentQuestion.expression,
+    userAnswer: userAnswer,
+    correctAnswer: exactAnswer,
+    correct: correct,
+    speedSec: elapsedSec,
+    timestamp: new Date().toISOString(),
+  });
+  saveRecords(records);
+
+  // 显示结果
+  const resultArea = document.getElementById('resultArea');
+  const inputEl = document.getElementById('answerInput');
+
+  if (correct) {
+    inputEl.className = 'correct';
+    resultArea.innerHTML =
+      '<div class="result-badge correct">✅ 正确！</div>' +
+      '<div class="solution-box">' +
+        '<h3>📖 详细解答</h3>' +
+        '<div class="step">' + escapeHtml(currentQuestion.solution) + '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+  } else {
+    inputEl.className = 'wrong';
+    resultArea.innerHTML =
+      '<div class="result-badge wrong">❌ 错误</div>' +
+      '<div style="font-size:15px;color:#64748b;margin-bottom:12px;">正确答案：<strong style="color:var(--success);font-size:18px;">' + escapeHtml(exactAnswer) + '</strong></div>' +
+      '<div class="solution-box">' +
+        '<h3>📖 详细解答</h3>' +
+        '<div class="step">' + escapeHtml(currentQuestion.solution) + '</div>' +
+      '</div>' +
+      '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+  }
+
+  btn.textContent = '已提交';
+  updateStats();
+}
+
+function clientVerify(userAnswer, correctAnswer, expression) {
+  // 浏览器端简单验证
+  const ua = userAnswer.trim();
+  const ca = correctAnswer.trim();
+
+  // 精确字符串匹配
+  if (ua === ca) return true;
+
+  // 尝试数值比较
+  try {
+    const uNum = parseFloat(ua);
+    const cNum = parseFloat(ca);
+    if (!isNaN(uNum) && !isNaN(cNum)) {
+      return Math.abs(uNum - cNum) < 0.001;
+    }
+  } catch (e) {}
+
+  // 分数比较
+  if (ua.includes('/') && ca.includes('/')) {
+    try {
+      const uParts = ua.split('/').map(s => parseFloat(s.trim()));
+      const cParts = ca.split('/').map(s => parseFloat(s.trim()));
+      if (uParts.length === 2 && cParts.length === 2 && !isNaN(uParts[0]) && !isNaN(uParts[1]) && !isNaN(cParts[0]) && !isNaN(cParts[1])) {
+        return Math.abs(uParts[0]/uParts[1] - cParts[0]/cParts[1]) < 0.001;
       }
-      area.innerHTML = '<div class="card review-empty"><div class="icon">\u{1F389}</div><p style="font-size:16px;font-weight:600;color:#333;">全部复习完毕！</p><p style="font-size:13px;margin-top:4px;">太棒了，当前没有待复习的内容</p>' + nextHtml + '</div>';
-    }
-    return;
+    } catch (e) {}
   }
 
-  var reviewItem;
-  if (currentReviewId) { reviewItem = dueItems.find(function(item) { return item.id === currentReviewId && item._type === currentReviewType; }); }
-  if (!reviewItem) { reviewItem = dueItems[0]; currentReviewId = reviewItem.id; currentReviewType = reviewItem._type; answerRevealed = false; }
-
-  var isSentence = reviewItem._type === 'sentence';
-
-  if (isSentence) {
-    renderSentenceReview(area, reviewItem, dueItems, now);
-  } else {
-    renderWordReview(area, reviewItem, dueItems, now);
-  }
-}
-
-function renderWordReview(area, reviewWord, dueItems, now) {
-  var stageLabel = reviewWord.stage >= TOTAL_STAGES
-    ? '第 ' + (reviewWord.stage + 1) + ' 次复习 · 年复习'
-    : '复习 ' + (reviewWord.stage + 1) + '/' + TOTAL_STAGES;
-  var overdueMs = now - new Date(reviewWord.nextReviewAt);
-  var overdueText = overdueMs > 0 ? formatDuration(overdueMs) + '前应复习' : '';
-
-  area.innerHTML =
-    '<div class="card review-card">' +
-      '<div class="word">' + escapeHtml(reviewWord.word) + '</div>' +
-      (reviewWord.phonetic || reviewWord.audioUrl ? '<div style="font-size:15px;color:#999;margin-bottom:6px;">' +
-        (reviewWord.phonetic ? escapeHtml(reviewWord.phonetic) : '') +
-        (reviewWord.audioUrl ? ' <span class="play-btn" onclick="playWordAudio(' + reviewWord.id + ')">🔊</span>' : '') +
-        '</div>' : '') +
-      '<div class="stage-badge">' + stageLabel + '</div>' +
-      (overdueText ? '<div style="font-size:12px;color:#FF4D4F;margin-bottom:8px;">' + overdueText + '</div>' : '') +
-      '<div class="definition" style="' + (answerRevealed ? '' : 'visibility:hidden;') + '">' + escapeHtml(reviewWord.definition) + '</div>' +
-      (!answerRevealed ? '<div class="hint">回想一下释义，然后点击下方按钮</div>' : '') +
-      '<div class="btn-group">' +
-        (!answerRevealed
-          ? '<button class="btn btn-primary" onclick="revealAnswer()">显示答案</button>'
-          : '<button class="btn btn-success" onclick="handleReview(true)">记住了</button><button class="btn btn-warning" onclick="handleReview(false)">忘记了</button>'
-        ) +
-      '</div>' +
-      (reviewWord.forgottenCount > 0 ? '<div style="font-size:11px;color:#bbb;margin-top:12px;">曾忘记 ' + reviewWord.forgottenCount + ' 次</div>' : '') +
-    '</div>' +
-    renderDueSidebar(dueItems, reviewWord.id, 'word', now);
-}
-
-function renderSentenceReview(area, sentence, dueItems, now) {
-  var stageLabel = sentence.stage >= TOTAL_STAGES
-    ? '第 ' + (sentence.stage + 1) + ' 次复习 · 年复习'
-    : '复习 ' + (sentence.stage + 1) + '/' + TOTAL_STAGES;
-  var overdueMs = now - new Date(sentence.nextReviewAt);
-  var overdueText = overdueMs > 0 ? formatDuration(overdueMs) + '前应复习' : '';
-
-  area.innerHTML =
-    '<div class="card review-card">' +
-      '<div class="sentence-badge">\u{1F4DD} 句子 ' + sentence.wordRange + '</div>' +
-      '<div class="word" style="font-size:24px;">' + escapeHtml(sentence.english) + '</div>' +
-      '<div class="stage-badge">' + stageLabel + '</div>' +
-      (overdueText ? '<div style="font-size:12px;color:#FF4D4F;margin-bottom:8px;">' + overdueText + '</div>' : '') +
-      '<div class="definition" style="font-size:18px;' + (answerRevealed ? '' : 'visibility:hidden;') + '">' + escapeHtml(sentence.chinese) + '</div>' +
-      (!answerRevealed ? '<div class="hint">回想一下中文翻译，然后点击下方按钮</div>' : '') +
-      '<div class="btn-group">' +
-        (!answerRevealed
-          ? '<button class="btn btn-primary" onclick="revealAnswer()">显示答案</button>'
-          : '<button class="btn btn-success" onclick="handleSentenceReview(true)">记住了</button><button class="btn btn-warning" onclick="handleSentenceReview(false)">忘记了</button>'
-        ) +
-      '</div>' +
-      (sentence.forgottenCount > 0 ? '<div style="font-size:11px;color:#bbb;margin-top:12px;">曾忘记 ' + sentence.forgottenCount + ' 次</div>' : '') +
-    '</div>' +
-    renderDueSidebar(dueItems, sentence.id, 'sentence', now);
-}
-
-function renderDueSidebar(dueItems, currentId, currentType, now) {
-  var others = dueItems.filter(function(item) { return !(item.id === currentId && item._type === currentType); });
-  return '<div class="card">' +
-    '<div style="font-size:13px;font-weight:600;color:#666;margin-bottom:8px;">其他待复习 (' + others.length + ')</div>' +
-    '<div class="review-list">' +
-      others.slice(0, 20).map(function(item) {
-        var overdue = now - new Date(item.nextReviewAt);
-        if (item._type === 'sentence') {
-          return '<div class="review-item sentence" onclick="switchReviewWord(' + item.id + ', \'sentence\')">' +
-            '<div class="word-info"><div class="word">\u{1F4DD} ' + escapeHtml(item.english) + '</div>' +
-            '<div class="meta">句子 ' + item.wordRange + ' - ' + (item.stage >= TOTAL_STAGES ? '年复习' : '复习 ' + (item.stage + 1) + '/' + TOTAL_STAGES) + '</div></div>' +
-            '<div class="overdue">' + (overdue > 0 ? formatShortDuration(overdue) + '前' : '即将') + '</div></div>';
-        } else {
-          return '<div class="review-item" onclick="switchReviewWord(' + item.id + ', \'word\')">' +
-            '<div class="word-info"><div class="word">' + escapeHtml(item.word) +
-            (item.phonetic || item.audioUrl ? ' <span style="font-size:11px;color:#999;">' +
-              (item.phonetic ? escapeHtml(item.phonetic) : '') +
-              (item.audioUrl ? ' <span class="play-btn" onclick="event.stopPropagation();playWordAudio(' + item.id + ')">🔊</span>' : '') +
-              '</span>' : '') + '</div>' +
-            '<div class="meta">' + (item.stage >= TOTAL_STAGES ? '年复习' : '复习 ' + (item.stage + 1) + '/' + TOTAL_STAGES) + ' - ' + formatShortDuration(overdue) + '</div></div>' +
-            '<div class="overdue">' + (overdue > 0 ? formatShortDuration(overdue) + '前' : '即将') + '</div></div>';
-        }
-      }).join('') +
-    '</div>' +
-  '</div>';
-}
-
-function switchReviewWord(id, type) { currentReviewId = id; currentReviewType = type || 'word'; answerRevealed = false; renderReview(); }
-function revealAnswer() { answerRevealed = true; renderReview(); }
-
-function handleReview(remembered) {
-  var words = loadWords();
-  var idx = words.findIndex(function(w) { return w.id === currentReviewId; });
-  if (idx === -1) return;
-  var word = words[idx];
-  var now = new Date();
-  word.reviewedAt.push(now.toISOString());
-
-  if (remembered) {
-    word.stage++;
-    if (word.stage >= TOTAL_STAGES) {
-      word.nextReviewAt = new Date(now.getTime() + YEARLY_INTERVAL).toISOString();
-      showToast('"' + word.word + '" 进入年复习（每年一次）');
-    } else {
-      word.nextReviewAt = new Date(now.getTime() + INTERVALS[word.stage]).toISOString();
-      showToast('"' + word.word + '" 进入第 ' + (word.stage + 1) + ' 次复习');
-    }
-  } else {
-    word.forgottenCount++;
-    word.stage = 0;
-    word.nextReviewAt = new Date(now.getTime() + INTERVALS[0]).toISOString();
-    showToast('"' + word.word + '" 已重置，重新开始');
-  }
-  saveWords(words);
-  currentReviewId = null;
-  answerRevealed = false;
-  lastAlarmTime = Date.now(); // 正在复习，重置闹铃计时
-  refreshAll();
-}
-
-function handleSentenceReview(remembered) {
-  var sentences = loadSentences();
-  var idx = sentences.findIndex(function(s) { return s.id === currentReviewId; });
-  if (idx === -1) return;
-  var sentence = sentences[idx];
-  var now = new Date();
-  sentence.reviewedAt.push(now.toISOString());
-
-  if (remembered) {
-    sentence.stage++;
-    if (sentence.stage >= TOTAL_STAGES) {
-      sentence.nextReviewAt = new Date(now.getTime() + YEARLY_INTERVAL).toISOString();
-      showToast('句子 ' + sentence.wordRange + ' 进入年复习（每年一次）');
-    } else {
-      sentence.nextReviewAt = new Date(now.getTime() + INTERVALS[sentence.stage]).toISOString();
-      showToast('句子 ' + sentence.wordRange + ' 进入第 ' + (sentence.stage + 1) + ' 次复习');
-    }
-  } else {
-    sentence.forgottenCount++;
-    sentence.stage = 0;
-    sentence.nextReviewAt = new Date(now.getTime() + INTERVALS[0]).toISOString();
-    showToast('句子 ' + sentence.wordRange + ' 已重置，重新开始');
-  }
-  saveSentences(sentences);
-  currentReviewId = null;
-  answerRevealed = false;
-  lastAlarmTime = Date.now(); // 正在复习，重置闹铃计时
-  refreshAll();
+  return false;
 }
 
 // ============================================================
-// 单词本
+// 统计 + 服务器同步
 // ============================================================
-var currentFilter = 'all';
+function updateStats() {
+  const records = loadRecords();
+  const today = new Date().toISOString().slice(0, 10);
+  const todayRecords = records.filter(r => r.timestamp && r.timestamp.slice(0, 10) === today);
 
-function renderBank() {
-  var words = loadWords();
-  var sentences = loadSentences();
-  var list = document.getElementById('wordList');
-  var senList = document.getElementById('sentenceList');
-  var filtered = words;
+  document.getElementById('statToday').textContent = todayRecords.length;
 
-  if (currentFilter === 'sentence') {
-    // 显示句子列表
-    list.innerHTML = '';
-    renderSentenceBank(senList, sentences);
+  const correct = todayRecords.filter(r => r.correct).length;
+  const total = todayRecords.length;
+  document.getElementById('statAccuracy').textContent = total === 0 ? '0%' : Math.round(correct / total * 100) + '%';
+
+  // 连续正确（按时间倒序）
+  const sorted = [...todayRecords].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  let streak = 0;
+  for (const r of sorted) {
+    if (r.correct) streak++;
+    else break;
+  }
+  document.getElementById('statStreak').textContent = streak;
+
+  // 平均速度
+  const speedRecords = todayRecords.filter(r => r.speedSec != null);
+  if (speedRecords.length > 0) {
+    const avgSpeed = Math.round(speedRecords.reduce((s, r) => s + r.speedSec, 0) / speedRecords.length);
+    document.getElementById('statSpeed').textContent = avgSpeed + 's';
+  } else {
+    document.getElementById('statSpeed').textContent = '--';
+  }
+
+  // 同步统计到服务器
+  syncStatsToServer(today, total, correct, speedRecords);
+}
+
+async function syncStatsToServer(today, total, correct, speedRecords) {
+  if (!useServer) return;
+  try {
+    // 先获取服务器现有统计
+    const getRes = await fetch('/api/stats', { cache: 'no-store' });
+    const serverStats = await getRes.json();
+
+    // 计算今日总用时
+    const totalTimeSec = speedRecords.reduce((s, r) => s + r.speedSec, 0);
+
+    // 更新今日统计
+    if (!serverStats.dailyStats) serverStats.dailyStats = {};
+    serverStats.dailyStats[today] = {
+      count: total,
+      correct: correct,
+      totalTimeSec: totalTimeSec,
+    };
+
+    // 写回服务器
+    await fetch('/api/stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serverStats),
+    });
+  } catch (e) { /* 静默失败 */ }
+}
+
+// ============================================================
+// 历史
+// ============================================================
+let historyFilter = 'all';
+
+function setHistoryFilter(filter) {
+  historyFilter = filter;
+  document.getElementById('filterToday').className = 'btn btn-sm ' + (filter === 'today' ? 'btn-primary' : 'btn-outline');
+  document.getElementById('filterAll').className = 'btn btn-sm ' + (filter === 'all' ? 'btn-primary' : 'btn-outline');
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  let records = loadRecords();
+
+  if (historyFilter === 'today') {
+    const today = new Date().toISOString().slice(0, 10);
+    records = records.filter(r => r.timestamp && r.timestamp.slice(0, 10) === today);
+  }
+
+  // 按时间倒序
+  records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  if (records.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>还没有练习记录</p></div>';
     return;
   }
 
-  // 显示单词列表
-  senList.innerHTML = '';
-  senList.style.display = 'none';
-
-  if (currentFilter === 'learning') { filtered = words.filter(function(w) { return w.stage < TOTAL_STAGES; }); }
-  else if (currentFilter === 'mastered') { filtered = words.filter(function(w) { return w.stage >= TOTAL_STAGES; }); }
-
-  filtered.sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
-
-  if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">\u{1F4D6}</div><p>' + (words.length === 0 ? '还没有单词，先去添加吧' : '没有匹配的单词') + '</p></div>';
-    return;
-  }
-
-  list.innerHTML = filtered.map(function(w) {
-    var isAnnual = w.stage >= TOTAL_STAGES;
-    var pct = isAnnual ? 100 : Math.min(100, Math.round((w.stage / TOTAL_STAGES) * 100));
-    var stageText = isAnnual ? '年复习 (' + (w.stage + 1) + '次)' : '复习 ' + (w.stage + 1) + '/' + TOTAL_STAGES;
-    var nextTime = w.nextReviewAt ? formatDateTime(w.nextReviewAt) : '--';
-    return '<div class="word-row">' +
-      '<div class="col-word">' + escapeHtml(w.word) +
-      (w.phonetic || w.audioUrl ? '<br><span style="font-size:11px;color:#999;">' +
-        (w.phonetic ? escapeHtml(w.phonetic) : '') +
-        (w.audioUrl ? ' <span class="play-btn" onclick="event.stopPropagation();playWordAudio(' + w.id + ')">🔊</span>' : '') +
-        '</span>' : '') + '</div>' +
-      '<div class="col-def">' + escapeHtml(w.definition) + '</div>' +
-      '<div class="col-stage"><div class="stage-bar"><div class="fill" style="width:' + pct + '%"></div></div>' +
-      '<div class="stage-label ' + (isAnnual ? 'stage-mastered' : '') + '">' + stageText + ' - 下次: ' + nextTime + '</div></div>' +
-      '<div class="col-action"><button class="btn-del" onclick="deleteWord(' + w.id + ')" title="删除">X</button></div></div>';
+  list.innerHTML = records.map(r => {
+    const time = new Date(r.timestamp);
+    const timeStr = pad(time.getHours()) + ':' + pad(time.getMinutes()) + ':' + pad(time.getSeconds());
+    return '<div class="history-item">' +
+      '<div class="history-icon">' + (r.correct ? '✅' : '❌') + '</div>' +
+      '<div class="history-body">' +
+        '<div class="h-question">' + escapeHtml(r.question || r.expression || '') + '</div>' +
+        '<div class="h-detail">' +
+          '你的答案: <strong>' + escapeHtml(r.userAnswer) + '</strong>' +
+          (!r.correct ? ' · 正确答案: <strong class="h-correct">' + escapeHtml(r.correctAnswer) + '</strong>' : '') +
+          ' · ' + timeStr +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 
-  // 在单词列表下方显示句子列表
-  if (sentences.length > 0 && currentFilter === 'all') {
-    renderSentenceBank(senList, sentences);
-  }
-}
-
-function renderSentenceBank(senList, sentences) {
-  if (!sentences || sentences.length === 0) {
-    senList.innerHTML = '<div class="empty-state"><div class="icon">\u{1F4DD}</div><p>还没有句子</p></div>';
-    senList.style.display = 'block';
-    return;
-  }
-
-  var sorted = sentences.slice().sort(function(a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
-  senList.innerHTML =
-    '<h3 style="font-size:14px;font-weight:600;color:#666;margin-bottom:12px;">\u{1F4DD} 句子 (' + sentences.length + ')</h3>' +
-    sorted.map(function(s) {
-      var stageText = s.stage >= TOTAL_STAGES ? '年复习 (' + (s.stage + 1) + '次)' : '复习 ' + (s.stage + 1) + '/' + TOTAL_STAGES;
-      var nextTime = s.nextReviewAt ? formatDateTime(s.nextReviewAt) : '--';
-      return '<div class="sentence-item">' +
-        '<div class="sen-english">' + escapeHtml(s.english) + '</div>' +
-        '<div class="sen-chinese">' + escapeHtml(s.chinese) + '</div>' +
-        '<div class="sen-meta">句子 #' + s.wordRange + ' - ' + stageText + ' - 下次: ' + nextTime +
-        ' <button class="btn-del" onclick="deleteSentence(' + s.id + ')" title="删除" style="font-size:14px;">X</button></div>' +
-        '</div>';
-    }).join('');
-  senList.style.display = 'block';
-}
-
-function deleteWord(id) {
-  if (!confirm('确定要删除这个单词吗？')) return;
-  var words = loadWords();
-  words = words.filter(function(w) { return w.id !== id; });
-  saveWords(words);
-  if (currentReviewId === id && currentReviewType === 'word') { currentReviewId = null; answerRevealed = false; }
-  showToast('已删除');
-  refreshAll();
-}
-
-function deleteSentence(id) {
-  if (!confirm('确定要删除这个句子吗？')) return;
-  var sentences = loadSentences();
-  sentences = sentences.filter(function(s) { return s.id !== id; });
-  saveSentences(sentences);
-  if (currentReviewId === id && currentReviewType === 'sentence') { currentReviewId = null; answerRevealed = false; }
-  showToast('句子已删除');
-  refreshAll();
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
 }
 
 // ============================================================
-// 统计
+// 数据管理
 // ============================================================
-function renderStats() {
-  var words = loadWords();
-  var sentences = loadSentences();
-  var now = new Date();
-  var total = words.length;
-  var annual = words.filter(function(w) { return w.stage >= TOTAL_STAGES; }).length;
-  var learning = total - annual;
-  var dueWords = words.filter(function(w) { return w.nextReviewAt && new Date(w.nextReviewAt) <= now; }).length;
-  var dueSentences = sentences.filter(function(s) { return s.nextReviewAt && new Date(s.nextReviewAt) <= now; }).length;
-  document.getElementById('statTotal').textContent = total;
-  document.getElementById('statDue').textContent = dueWords + dueSentences;
-  document.getElementById('statLearning').textContent = learning;
-  document.getElementById('statMastered').textContent = annual;
-  document.getElementById('statSentenceCount').textContent = sentences.length;
-
-  // 更新下次复习时间
-  var dueTotal = dueWords + dueSentences;
-  var nextEl = document.getElementById('statNextTime');
-  if (dueTotal > 0) {
-    // 有单词待复习，显示"现在！"
-    nextEl.textContent = '现在!';
-    nextEl.style.fontSize = '22px';
-    nextEl.style.color = '#EF4444';
-  } else {
-    var nextTime = findNextReviewTime(now);
-    if (nextTime) {
-      var diff = nextTime - now;
-      if (diff < 3600000) {
-        nextEl.textContent = formatDuration(diff) + '后';
-        nextEl.style.fontSize = '16px';
-        nextEl.style.color = '#F97316';
-      } else {
-        nextEl.textContent = formatTime(nextTime);
-        nextEl.style.fontSize = '18px';
-        nextEl.style.color = '#F97316';
-      }
-    } else {
-      nextEl.textContent = '--';
-      nextEl.style.color = '#94a3b8';
-    }
-  }
-}
-
-// ============================================================
-// 导出 / 导入 / 保存到文件
-// ============================================================
-function saveToFile() {
-  var words = loadWords();
-  var sentences = loadSentences();
-  if (words.length === 0 && sentences.length === 0) { showToast('没有数据可保存'); return; }
-  var json = JSON.stringify({ words: words, sentences: sentences }, null, 2);
-  var blob = new Blob([json], { type: 'application/json' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'vocabulary-data.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('已保存到 vocabulary-data.json');
+function clearHistory() {
+  if (!confirm('确定要清空所有练习记录吗？此操作不可恢复。')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  showToast('已清空所有记录');
+  updateStats();
+  renderHistory();
 }
 
 function exportData() {
-  var words = loadWords();
-  var sentences = loadSentences();
-  if (words.length === 0 && sentences.length === 0) { showToast('没有数据可导出'); return; }
-  var json = JSON.stringify({ words: words, sentences: sentences }, null, 2);
-  var blob = new Blob([json], { type: 'application/json' });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
+  const records = loadRecords();
+  if (records.length === 0) { showToast('没有数据可导出'); return; }
+  const json = JSON.stringify({ records: records, exportedAt: new Date().toISOString() }, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url;
-  a.download = 'vocabulary-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.download = 'math-records-' + new Date().toISOString().slice(0, 10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
   showToast('导出成功');
 }
 
 function importData(event) {
-  var file = event.target.files[0];
+  const file = event.target.files[0];
   if (!file) return;
-  var reader = new FileReader();
+  const reader = new FileReader();
   reader.onload = function(e) {
     try {
-      var data = JSON.parse(e.target.result);
-      var words = [];
-      var sentences = [];
-
+      const data = JSON.parse(e.target.result);
+      let records = [];
       if (Array.isArray(data)) {
-        // 旧格式：纯单词数组
-        words = data;
-      } else if (data && data.words) {
-        // 新格式：{words, sentences}
-        words = data.words || [];
-        sentences = data.sentences || [];
+        records = data;
+      } else if (data && data.records) {
+        records = data.records;
       } else {
         throw new Error('格式错误');
       }
-
-      for (var i = 0; i < words.length; i++) {
-        if (!words[i].word || words[i].stage === undefined) throw new Error('数据结构不完整');
-      }
-
-      if (!confirm('即将导入 ' + words.length + ' 个单词和 ' + sentences.length + ' 个句子，这会覆盖当前所有数据，确定吗？')) return;
-      saveData(words, sentences);
-      showToast('成功导入 ' + words.length + ' 个单词, ' + sentences.length + ' 个句子');
-      refreshAll();
-      generateMissingSentences();
+      if (!confirm('即将导入 ' + records.length + ' 条记录，这会覆盖当前所有数据，确定吗？')) return;
+      saveRecords(records);
+      showToast('成功导入 ' + records.length + ' 条记录');
+      updateStats();
+      renderHistory();
     } catch (err) {
-      showToast('文件格式错误，请选择有效的 JSON 文件');
-      console.error(err);
+      showToast('文件格式错误');
     }
   };
   reader.readAsText(file);
@@ -1604,140 +990,42 @@ function setupTabs() {
   });
 }
 
-function setupFilters() {
-  document.querySelectorAll('.filter-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      renderBank();
-    });
-  });
-}
-
-// ============================================================
-// 工具函数
-// ============================================================
-function playWordAudio(id) {
-  var words = loadWords();
-  var word = words.find(function(w) { return w.id === id; });
-  if (word && word.audioUrl) {
-    var audio = new Audio(word.audioUrl);
-    audio.play().catch(function(e) { console.warn('播放音频失败:', e); });
-  }
-}
 function escapeHtml(str) {
-  var div = document.createElement('div');
+  const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
-function formatDuration(ms) {
-  var seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return seconds + '秒';
-  var minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes + '分钟';
-  var hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + '小时' + (minutes % 60) + '分钟';
-  var days = Math.floor(hours / 24);
-  return days + '天' + (hours % 24) + '小时';
-}
-
-function formatShortDuration(ms) {
-  var seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return seconds + '秒';
-  var minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes + '分钟';
-  var hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + '小时';
-  var days = Math.floor(hours / 24);
-  return days + '天';
-}
-
-function formatDateTime(isoStr) {
-  var d = toBeijingTime(isoStr);
-  return pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
-}
-
-function findNextReviewTime(now) {
-  if (!now) now = new Date();
-  var words = loadWords();
-  var sentences = loadSentences();
-  var nearest = null;
-  words.concat(sentences).forEach(function(item) {
-    if (item.nextReviewAt) {
-      var t = new Date(item.nextReviewAt);
-      if (t > now && (nearest === null || t < nearest)) {
-        nearest = t;
-      }
-    }
-  });
-  // 如果所有项目都已过期（无未来复习），则取最近的一个过期时间作为后备
-  if (!nearest) {
-    words.concat(sentences).forEach(function(item) {
-      if (item.nextReviewAt) {
-        var t = new Date(item.nextReviewAt);
-        if (nearest === null || t > nearest) {
-          nearest = t;
-        }
-      }
-    });
-  }
-  return nearest;
-}
-
-function toBeijingTime(isoStr) {
-  var d = new Date(isoStr);
-  // 加 8 小时转为北京时间
-  return new Date(d.getTime() + 8 * 60 * 60 * 1000);
-}
-
-function formatTime(isoStr) {
-  var d = toBeijingTime(isoStr);
-  return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
-  function pad(n) { return n < 10 ? '0' + n : '' + n; }
-}
-
 function refreshAll() {
-  renderStats();
-  renderReview();
-  renderBank();
-  var cntEl = document.getElementById('fileDetailCount');
-  if (cntEl) {
-    var words = loadWords();
-    var sentences = loadSentences();
-    cntEl.textContent = words.length + ' 个单词, ' + sentences.length + ' 个句子';
+  updateStats();
+  const activePane = document.querySelector('.tab-pane.active');
+  if (activePane && activePane.id === 'pane-history') {
+    renderHistory();
   }
 }
-
-setInterval(refreshAll, 60000);
 
 // ============================================================
 // 初始化
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
   setupTabs();
-  setupFilters();
-  // 预填 API Key
-  var savedKey = getApiKey();
+
+  const savedKey = getApiKey();
   if (savedKey) {
     document.getElementById('apiKeyInput').value = savedKey;
   }
-  // 先渲染界面（从 localStorage 加载）
-  refreshAll();
-  // 再检测服务器，如果有服务器数据则覆盖 localStorage
+
+  // 初始状态：显示生成按钮
+  const area = document.getElementById('practiceArea');
+  area.innerHTML =
+    '<div class="card question-area" style="padding:48px 20px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">🧮</div>' +
+      '<p style="font-size:16px;color:#64748b;margin-bottom:20px;">点击下方按钮，AI 将为你生成一道口算题</p>' +
+      '<button class="btn btn-primary" style="font-size:16px;padding:14px 36px;" onclick="generateQuestion()">生成题目</button>' +
+    '</div>';
+
+  updateStats();
   detectServer();
-  // 请求通知权限（浏览器会显示一次性的权限询问弹窗）
-  requestNotifyPermission();
-  // 启动实时闹铃检测器（每秒检查是否有待复习内容）
-  startAlarmChecker();
-  // 切换回标签页时刷新并检查是否需要提醒
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-      refreshAll();
-    }
-  });
 });
 </script>
 </body>

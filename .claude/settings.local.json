@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(python -c \"import json; data=json.load\\(open\\(r''C:\\\\Users\\\\lijua\\\\Desktop\\\\QuestionGenerator\\\\vocabulary-data.json'',''r''\\)\\); print\\(''Words:'', len\\(data.get\\(''words'',[]\\)\\)\\); print\\(''Sentences:'', len\\(data.get\\(''sentences'',[]\\)\\)\\); print\\(''---''\\); print\\(''Keys:'', list\\(data.keys\\(\\)\\)\\)\")"
     ]
   }
 }

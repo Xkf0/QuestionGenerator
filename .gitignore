@@ -1,5 +1,6 @@
-# 用户词汇数据（每个人自己的数据，不提交）
+# 用户数据文件（每个人自己的数据，不提交）
 vocabulary-data.json
+stats-data.json
 
 # Python 缓存
 __pycache__/
