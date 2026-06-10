@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>AI 口算练习</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -303,6 +306,82 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Matrix */
+    .matrix-area { text-align: center; }
+    .matrix-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+    .matrix-box {
+      display: inline-block;
+      border-left: 3px solid #1e293b;
+      border-right: 3px solid #1e293b;
+      padding: 4px 8px;
+      background: #f8faff;
+      border-radius: 4px;
+    }
+    .matrix-box table { border-collapse: collapse; }
+    .matrix-box td {
+      width: 40px;
+      height: 36px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .matrix-box input {
+      width: 40px;
+      height: 36px;
+      border: 2px solid #e2e8f0;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      outline: none;
+      background: #fff;
+      transition: border-color 0.2s;
+    }
+    .matrix-box input:focus { border-color: var(--primary-light); }
+    .matrix-box input.correct { border-color: var(--success); background: #f0fdf4; }
+    .matrix-box input.wrong { border-color: var(--danger); background: #fef2f2; }
+    .matrix-op {
+      font-size: 28px;
+      font-weight: 800;
+      color: #1e293b;
+      padding: 0 4px;
+    }
+    .matrix-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    /* Type selector */
+    .type-selector {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .type-btn {
+      padding: 8px 20px;
+      border: 2px solid #e2e8f0;
+      border-radius: 20px;
+      background: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #64748b;
+    }
+    .type-btn:hover { border-color: var(--primary-light); color: var(--primary); }
+    .type-btn.active { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
+
     /* History */
     .history-item {
       padding: 12px 0;
@@ -550,6 +629,7 @@ function showToast(msg) {
 let currentQuestion = null; // { question, expression, answer, answerType, solution }
 let answered = false;
 let questionStartTime = 0; // 题目开始时间（毫秒时间戳）
+let questionType = 'arithmetic'; // 'arithmetic' | 'matrix'
 
 async function generateQuestion() {
   const apiKey = getApiKey();
@@ -567,7 +647,7 @@ async function generateQuestion() {
       const res = await fetch('/api/question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ apiKey, questionType }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -580,7 +660,7 @@ async function generateQuestion() {
       data = await res.json();
     } else {
       // 浏览器模式：直接调用 DeepSeek API
-      data = await callDeepSeekDirect(apiKey);
+      data = await callDeepSeekDirect(apiKey, questionType);
     }
 
     if (!data || data.error) {
@@ -604,7 +684,9 @@ async function generateQuestion() {
 }
 
 // 浏览器模式直接调用 DeepSeek
-async function callDeepSeekDirect(apiKey) {
+async function callDeepSeekDirect(apiKey, type) {
+  if (type === 'matrix') return callDeepSeekDirectMatrix(apiKey);
+
   const prompt = `你是一个口算题生成器。请生成一道符合以下全部约束的口算题：
 
 数字约束：
@@ -676,9 +758,75 @@ async function callDeepSeekDirect(apiKey) {
   return json;
 }
 
+// 浏览器模式：矩阵乘法
+async function callDeepSeekDirectMatrix(apiKey) {
+  const prompt = `你是一个矩阵乘法出题器。请生成一道矩阵乘法题。
+
+约束：
+- 矩阵A的维度为 m×n，矩阵B的维度为 n×l
+- m, n, l 各自在 1 到 3 之间
+- 矩阵中的每个数字都是0-9的一位整数，不允许小数或分数
+- 结果矩阵的每个元素不能超过3位数字
+
+请严格按以下 JSON 格式返回，不要包含其他内容：
+{
+  "question": "计算矩阵 A × B",
+  "matrixA": [[每行用逗号分隔, 如 [1,2],[3,4]]],
+  "matrixB": [[每行用逗号分隔]],
+  "answer": [[计算结果的每一行]],
+  "rows": m,
+  "cols": l,
+  "innerDim": n,
+  "solution": "详细的解题步骤，每步单独一行，说明每个元素的计算过程"
+}`;
+
+  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1500,
+    }),
+  });
+
+  if (!res.ok) {
+    return { error: 'API 返回 ' + res.status + '，请检查 API Key' };
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) return { error: 'AI 返回为空' };
+
+  // 解析 JSON
+  let json;
+  if (content.startsWith('{')) {
+    try { json = JSON.parse(content); } catch (e) {}
+  }
+  if (!json) {
+    const m = content.match(/```(?:json)?\s*\n?(.*?)\n?```/s);
+    if (m) {
+      try { json = JSON.parse(m[1].trim()); } catch (e) {}
+    }
+  }
+  if (!json || !json.matrixA || !json.matrixB) {
+    return { error: 'AI 返回格式错误，请重试' };
+  }
+  return json;
+}
+
 function renderQuestion() {
   if (!currentQuestion) return;
   const area = document.getElementById('practiceArea');
+
+  if (currentQuestion.matrixA && currentQuestion.matrixB) {
+    renderMatrixQuestion();
+    return;
+  }
 
   area.innerHTML =
     '<div class="card question-area">' +
@@ -692,6 +840,204 @@ function renderQuestion() {
     '</div>';
 
   document.getElementById('answerInput').focus();
+}
+
+// ============================================================
+// 矩阵渲染
+// ============================================================
+function renderMatrixQuestion() {
+  if (!currentQuestion) return;
+  const q = currentQuestion;
+  const rows = q.rows || q.matrixA.length;
+  const cols = q.cols || q.matrixB[0].length;
+  const innerDim = q.innerDim || q.matrixA[0].length;
+
+  let html = '<div class="card matrix-area">';
+  html += '<div class="question-text" style="font-size:22px;">' + escapeHtml(q.question || '计算矩阵 A × B') + '</div>';
+
+  // 矩阵 A × 矩阵 B = 用户输入矩阵
+  html += '<div class="matrix-row">';
+  html += '<div><div class="matrix-label">A</div>' + renderMatrixTable(q.matrixA) + '</div>';
+  html += '<span class="matrix-op">×</span>';
+  html += '<div><div class="matrix-label">B</div>' + renderMatrixTable(q.matrixB) + '</div>';
+  html += '<span class="matrix-op">=</span>';
+  // 用户输入的答案矩阵
+  html += '<div><div class="matrix-label">结果</div>' + renderMatrixInputs(rows, cols) + '</div>';
+  html += '</div>';
+
+  html += '<div style="color:#94a3b8;font-size:13px;margin-top:8px;margin-bottom:12px;">在结果矩阵中填入每个元素的值</div>';
+  html += '<div><button class="btn btn-success" id="submitBtn" onclick="submitMatrixAnswer()">提交</button></div>';
+  html += '<div id="resultArea"></div>';
+  html += '</div>';
+
+  document.getElementById('practiceArea').innerHTML = html;
+
+  // 聚焦第一个输入框
+  const firstInput = document.querySelector('.matrix-box input');
+  if (firstInput) firstInput.focus();
+}
+
+function renderMatrixTable(matrix) {
+  if (!matrix || !matrix.length) return '';
+  let html = '<div class="matrix-box"><table>';
+  for (let i = 0; i < matrix.length; i++) {
+    html += '<tr>';
+    for (let j = 0; j < matrix[i].length; j++) {
+      html += '<td>' + escapeHtml('' + matrix[i][j]) + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+function renderMatrixInputs(rows, cols) {
+  let html = '<div class="matrix-box"><table id="matrixInputTable">';
+  for (let i = 0; i < rows; i++) {
+    html += '<tr>';
+    for (let j = 0; j < cols; j++) {
+      html += '<td><input type="text" class="matrix-cell" data-row="' + i + '" data-col="' + j + '" maxlength="4" autocomplete="off"></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+function collectMatrixAnswer() {
+  const inputs = document.querySelectorAll('.matrix-cell');
+  const rows = currentQuestion.rows || currentQuestion.matrixA.length;
+  const cols = currentQuestion.cols || currentQuestion.matrixB[0].length;
+  const result = [];
+  for (let i = 0; i < rows; i++) {
+    result[i] = [];
+    for (let j = 0; j < cols; j++) {
+      const val = document.querySelector('.matrix-cell[data-row="' + i + '"][data-col="' + j + '"]');
+      result[i][j] = val ? val.value.trim() : '';
+    }
+  }
+  return result;
+}
+
+async function submitMatrixAnswer() {
+  if (!currentQuestion || answered) return;
+
+  const userMatrix = collectMatrixAnswer();
+  // 检查是否所有格子都已填写
+  for (let i = 0; i < userMatrix.length; i++) {
+    for (let j = 0; j < userMatrix[i].length; j++) {
+      if (userMatrix[i][j] === '') {
+        showToast('请填写所有格子');
+        return;
+      }
+    }
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '核验中...';
+
+  let correct = false;
+  let exactAnswer = null;
+
+  if (useServer) {
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionType: 'matrix',
+          matrixA: currentQuestion.matrixA,
+          matrixB: currentQuestion.matrixB,
+          userAnswer: userMatrix,
+        }),
+      });
+      const data = await res.json();
+      correct = data.correct;
+      exactAnswer = data.computedAnswer || data.exactAnswer;
+    } catch (e) {
+      correct = clientVerifyMatrix(userMatrix, currentQuestion.answer);
+    }
+  } else {
+    correct = clientVerifyMatrix(userMatrix, currentQuestion.answer);
+  }
+
+  answered = true;
+  const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
+
+  // 保存记录
+  const records = loadRecords();
+  records.push({
+    id: Date.now() + Math.random(),
+    question: currentQuestion.question || '矩阵乘法',
+    expression: JSON.stringify({ matrixA: currentQuestion.matrixA, matrixB: currentQuestion.matrixB }),
+    userAnswer: JSON.stringify(userMatrix),
+    correctAnswer: exactAnswer ? JSON.stringify(exactAnswer) : JSON.stringify(currentQuestion.answer),
+    correct: correct,
+    speedSec: elapsedSec,
+    timestamp: new Date().toISOString(),
+    questionType: 'matrix',
+  });
+  saveRecords(records);
+
+  // 显示结果
+  displayMatrixResult(correct, userMatrix, exactAnswer || currentQuestion.answer);
+
+  btn.textContent = '已提交';
+  updateStats();
+}
+
+function displayMatrixResult(correct, userMatrix, correctMatrix) {
+  const resultArea = document.getElementById('resultArea');
+
+  if (correct) {
+    resultArea.innerHTML =
+      '<div class="result-badge correct">✅ 正确！</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">正确结果</div>' + renderMatrixTable(correctMatrix) + '</div>';
+  } else {
+    resultArea.innerHTML =
+      '<div class="result-badge wrong">❌ 错误</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">正确结果</div>' + renderMatrixTable(correctMatrix) + '</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">你的输入</div>' + renderMatrixTable(userMatrix) + '</div>';
+  }
+
+  // 逐个格子高亮
+  const rows = correctMatrix.length;
+  const cols = correctMatrix[0].length;
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const input = document.querySelector('.matrix-cell[data-row="' + i + '"][data-col="' + j + '"]');
+      if (input) {
+        const userVal = input.value.trim();
+        const correctVal = '' + correctMatrix[i][j];
+        if (userVal === correctVal) {
+          input.className = 'matrix-cell correct';
+        } else {
+          input.className = 'matrix-cell wrong';
+        }
+      }
+    }
+  }
+
+  // solution + 下一题
+  resultArea.innerHTML +=
+    '<div class="solution-box">' +
+      '<h3>📖 详细解答</h3>' +
+      '<div class="step">' + escapeHtml(currentQuestion.solution || '') + '</div>' +
+    '</div>' +
+    '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+}
+
+function clientVerifyMatrix(userMatrix, correctMatrix) {
+  if (!userMatrix || !correctMatrix) return false;
+  if (userMatrix.length !== correctMatrix.length) return false;
+  for (let i = 0; i < userMatrix.length; i++) {
+    if (userMatrix[i].length !== correctMatrix[i].length) return false;
+    for (let j = 0; j < userMatrix[i].length; j++) {
+      if (parseInt(userMatrix[i][j]) !== parseInt(correctMatrix[i][j])) return false;
+    }
+  }
+  return true;
 }
 
 // ============================================================
@@ -909,7 +1255,9 @@ function renderHistory() {
     return '<div class="history-item">' +
       '<div class="history-icon">' + (r.correct ? '✅' : '❌') + '</div>' +
       '<div class="history-body">' +
-        '<div class="h-question">' + escapeHtml(r.question || r.expression || '') + '</div>' +
+        '<div class="h-question">' + escapeHtml(r.question || r.expression || '') + ' ' +
+          (r.questionType === 'matrix' ? '<span style="font-size:11px;color:#6B8AFF;font-weight:600;">[矩阵]</span>' : '') +
+        '</div>' +
         '<div class="h-detail">' +
           '你的答案: <strong>' + escapeHtml(r.userAnswer) + '</strong>' +
           (!r.correct ? ' · 正确答案: <strong class="h-correct">' + escapeHtml(r.correctAnswer) + '</strong>' : '') +
@@ -996,6 +1344,15 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function setQuestionType(type, btn) {
+  questionType = type;
+  document.querySelectorAll('.type-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  // 更新提示文字
+  const p = document.querySelector('.question-area p');
+  if (p) p.textContent = '点击下方按钮，AI 将为你生成一道' + (type === 'matrix' ? '矩阵乘法题' : '口算题');
+}
+
 function refreshAll() {
   updateStats();
   const activePane = document.querySelector('.tab-pane.active');
@@ -1015,12 +1372,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('apiKeyInput').value = savedKey;
   }
 
-  // 初始状态：显示生成按钮
+  // 初始状态：显示生成按钮和类型选择
   const area = document.getElementById('practiceArea');
   area.innerHTML =
     '<div class="card question-area" style="padding:48px 20px;">' +
+      '<div class="type-selector">' +
+        '<button class="type-btn active" data-type="arithmetic" onclick="setQuestionType(\'arithmetic\', this)">口算题</button>' +
+        '<button class="type-btn" data-type="matrix" onclick="setQuestionType(\'matrix\', this)">矩阵乘法</button>' +
+      '</div>' +
       '<div style="font-size:48px;margin-bottom:16px;">🧮</div>' +
-      '<p style="font-size:16px;color:#64748b;margin-bottom:20px;">点击下方按钮，AI 将为你生成一道口算题</p>' +
+      '<p style="font-size:16px;color:#64748b;margin-bottom:20px;">点击下方按钮，AI 将为你生成一道' + (questionType === 'matrix' ? '矩阵乘法题' : '口算题') + '</p>' +
       '<button class="btn btn-primary" style="font-size:16px;padding:14px 36px;" onclick="generateQuestion()">生成题目</button>' +
     '</div>';
 

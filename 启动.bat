@@ -12,10 +12,14 @@ if %errorlevel% equ 0 (
     echo.
     echo   * 需要配置 DeepSeek API Key 才能使用
     echo.
+    echo [..] 清理旧进程...
+    taskkill /f /im python.exe >nul 2>&1
+    timeout /t 1 /nobreak >nul
+    echo.
     start "MathServer" python server.py
-    timeout /t 2 /nobreak >nul
+    timeout /t 3 /nobreak >nul
     echo [OK] 正在打开浏览器...
-    start http://localhost:3000/
+    start http://localhost:3000/?_=%random%
     echo.
     echo ============================================
     echo  应用已启动！
