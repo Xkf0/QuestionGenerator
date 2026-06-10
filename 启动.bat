@@ -19,12 +19,12 @@ if %errorlevel% equ 0 (
     start "MathServer" python server.py
     timeout /t 3 /nobreak >nul
     echo [OK] 正在打开浏览器...
-    start http://localhost:3000/?_=%random%
+    start http://localhost:3001/?_=%random%
     echo.
     echo ============================================
     echo  应用已启动！
     echo  如果浏览器未自动打开，请手动访问：
-    echo    http://localhost:3000/
+    echo    http://localhost:3001/
     echo.
     echo  关闭此窗口即可停止服务器
     echo ============================================

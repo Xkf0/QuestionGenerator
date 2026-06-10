@@ -644,14 +644,34 @@ const API_KEY_KEY = 'math_api_key';
 // ============================================================
 let useServer = false;
 
-function loadRecords() {
+async function loadRecords() {
+  if (useServer) {
+    try {
+      const res = await fetch('/api/records', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const records = data.records || [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        return records;
+      }
+    } catch (e) { /* 服务器不可用，走本地回退 */ }
+  }
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
   } catch { return []; }
 }
 
-function saveRecords(records) {
+async function saveRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  if (useServer) {
+    try {
+      await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records }),
+      });
+    } catch (e) { /* 静默失败 */ }
+  }
 }
 
 function getApiKey() {
@@ -1186,7 +1206,7 @@ async function submitMatrixAnswer() {
   const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
 
   // 保存记录
-  const records = loadRecords();
+  const records = await loadRecords();
   records.push({
     id: Date.now() + Math.random(),
     question: currentQuestion.question || '矩阵乘法',
@@ -1198,7 +1218,7 @@ async function submitMatrixAnswer() {
     timestamp: new Date().toISOString(),
     questionType: 'matrix',
   });
-  saveRecords(records);
+  await saveRecords(records);
 
   // 显示结果
   displayMatrixResult(correct, userMatrix, exactAnswer || currentQuestion.answer);
@@ -1445,7 +1465,7 @@ async function submitInverseAnswer() {
   const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
 
   // 保存记录
-  const records = loadRecords();
+  const records = await loadRecords();
   records.push({
     id: Date.now() + Math.random(),
     question: '逆矩阵: ' + JSON.stringify(currentQuestion.matrixA),
@@ -1457,7 +1477,7 @@ async function submitInverseAnswer() {
     timestamp: new Date().toISOString(),
     questionType: 'inverse',
   });
-  saveRecords(records);
+  await saveRecords(records);
 
   displayInverseResult(correct, userMatrix, currentQuestion.answer);
 
@@ -1614,7 +1634,7 @@ async function submitEquationAnswer() {
   const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
 
   // 保存记录
-  const records = loadRecords();
+  const records = await loadRecords();
   records.push({
     id: Date.now() + Math.random(),
     question: (currentQuestion.equations || ['方程组']).join('; '),
@@ -1626,7 +1646,7 @@ async function submitEquationAnswer() {
     timestamp: new Date().toISOString(),
     questionType: 'equation',
   });
-  saveRecords(records);
+  await saveRecords(records);
 
   // 显示结果
   displayEquationResult(correct, userAnswer, exactAnswer || currentQuestion.answer, vars);
@@ -1741,7 +1761,7 @@ async function submitAnswer() {
   const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
 
   // 保存记录
-  const records = loadRecords();
+  const records = await loadRecords();
   records.push({
     id: Date.now() + Math.random(),
     question: currentQuestion.question,
@@ -1753,7 +1773,7 @@ async function submitAnswer() {
     timestamp: new Date().toISOString(),
     questionType: currentQuestion.questionType || questionType,
   });
-  saveRecords(records);
+  await saveRecords(records);
 
   // 显示结果
   const resultArea = document.getElementById('resultArea');
@@ -1824,8 +1844,8 @@ function clientVerify(userAnswer, correctAnswer, expression) {
 // ============================================================
 // 统计 + 服务器同步
 // ============================================================
-function updateStats() {
-  const records = loadRecords();
+async function updateStats() {
+  const records = await loadRecords();
   const today = new Date().toISOString().slice(0, 10);
   const todayRecords = records.filter(r => r.timestamp && r.timestamp.slice(0, 10) === today);
 
@@ -1889,10 +1909,10 @@ async function syncStatsToServer(today, total, correct, speedRecords) {
 // ============================================================
 let historyDate = null; // null = 显示日期列表, '2026-06-08' = 显示该日详情
 
-function renderHistory() {
+async function renderHistory() {
   const list = document.getElementById('historyList');
   const header = document.getElementById('historyHeader');
-  const records = loadRecords();
+  const records = await loadRecords();
 
   if (records.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>还没有练习记录</p></div>';
@@ -2016,16 +2036,26 @@ function renderDateDetail(list, records, header) {
 // ============================================================
 // 数据管理
 // ============================================================
-function clearHistory() {
+async function clearHistory() {
   if (!confirm('确定要清空所有练习记录吗？此操作不可恢复。')) return;
   localStorage.removeItem(STORAGE_KEY);
+  // 如果服务器可用，也通知服务器
+  if (useServer) {
+    try {
+      await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: [] }),
+      });
+    } catch (e) { /* 静默失败 */ }
+  }
   showToast('已清空所有记录');
   updateStats();
   renderHistory();
 }
 
-function exportData() {
-  const records = loadRecords();
+async function exportData() {
+  const records = await loadRecords();
   if (records.length === 0) { showToast('没有数据可导出'); return; }
   const json = JSON.stringify({ records: records, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -2042,7 +2072,7 @@ function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = JSON.parse(e.target.result);
       let records = [];
@@ -2054,7 +2084,7 @@ function importData(event) {
         throw new Error('格式错误');
       }
       if (!confirm('即将导入 ' + records.length + ' 条记录，这会覆盖当前所有数据，确定吗？')) return;
-      saveRecords(records);
+      await saveRecords(records);
       showToast('成功导入 ' + records.length + ' 条记录');
       updateStats();
       renderHistory();
@@ -2102,7 +2132,7 @@ function endPractice() {
   showHomeScreen();
 }
 
-function showHomeScreen() {
+async function showHomeScreen() {
   const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组', inverse: '逆矩阵' };
   const area = document.getElementById('practiceArea');
   area.innerHTML =
@@ -2119,18 +2149,18 @@ function showHomeScreen() {
   updateStats();
 }
 
-function refreshAll() {
+async function refreshAll() {
   updateStats();
   const activePane = document.querySelector('.tab-pane.active');
   if (activePane && activePane.id === 'pane-history') {
-    renderHistory();
+    await renderHistory();
   }
 }
 
 // ============================================================
 // 初始化
 // ============================================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   setupTabs();
 
   const savedKey = getApiKey();
@@ -2142,8 +2172,14 @@ document.addEventListener('DOMContentLoaded', function() {
   showHomeScreen();
 
   updateStats();
-  // 在后台启动服务器检测
+  // 在后台启动服务器检测，完成后刷新数据
   serverDetectionPromise = detectServer();
+  serverDetectionPromise.then(function() {
+    if (useServer) {
+      updateStats();
+      renderHistory();
+    }
+  });
 });
 </script>
 </body>

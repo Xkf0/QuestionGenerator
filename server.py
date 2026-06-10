@@ -1,6 +1,6 @@
 """
 AI 口算练习 - 本地服务器
-启动后访问 http://localhost:3000
+启动后访问 http://localhost:3001
 """
 import http.server
 import json
@@ -12,7 +12,7 @@ import urllib.request
 import urllib.error
 from fractions import Fraction
 
-PORT = 3000
+PORT = 3001
 STATS_FILE = os.path.join(os.path.dirname(__file__), 'stats-data.json')
 
 
@@ -1354,6 +1354,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/stats':
             stats = load_stats()
             self._send_json(stats)
+        elif self.path == '/api/records':
+            stats = load_stats()
+            records = stats.get('records', [])
+            self._send_json({'records': records})
         elif self.path.split('?')[0] in ('/', '/index.html'):
             self._send_file(os.path.join(os.path.dirname(__file__), 'index.html'), 'text/html; charset=utf-8')
         else:
@@ -1427,6 +1431,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({'error': '缺少数据'}, 400)
                 return
             save_stats(body)
+            self._send_json({'ok': True})
+
+        elif self.path == '/api/records':
+            body = self._read_body()
+            if not body or 'records' not in body:
+                self._send_json({'error': '缺少 records 字段'}, 400)
+                return
+            stats = load_stats()
+            stats['records'] = body['records']
+            save_stats(stats)
             self._send_json({'ok': True})
 
         else:

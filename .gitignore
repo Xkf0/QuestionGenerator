@@ -2,6 +2,12 @@
 vocabulary-data.json
 stats-data.json
 
+# Windows 保留设备名
+nul
+aux
+prn
+con
+
 # Python 缓存
 __pycache__/
 *.pyc
