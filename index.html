@@ -397,6 +397,27 @@
     .history-body .h-detail { font-size: 12px; color: #94a3b8; margin-top: 2px; }
     .history-body .h-correct { color: var(--success); font-weight: 600; }
     .history-body .h-wrong { color: var(--danger); font-weight: 600; }
+    .history-body .h-type {
+      display:inline-block; font-size:10px; padding:1px 6px; border-radius:8px;
+      background:#eef2ff; color:var(--primary); font-weight:600; margin-left:4px;
+    }
+
+    /* Date list */
+    .date-list { margin-top: 4px; }
+    .date-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; transition: background 0.15s; border-bottom: 1px solid #f1f5f9;
+    }
+    .date-item:last-child { border-bottom: none; }
+    .date-item:hover { background: #f8faff; }
+    .date-item .d-left { display: flex; align-items: center; gap: 10px; }
+    .date-item .d-date { font-weight: 700; font-size: 15px; color: #0f172a; }
+    .date-item .d-weekday { font-size: 12px; color: #94a3b8; }
+    .date-item .d-stats { font-size: 13px; color: #64748b; display: flex; gap: 14px; }
+    .date-item .d-stats span { white-space: nowrap; }
+    .date-item .d-arrow { color: #cbd5e1; font-size: 16px; }
+    .back-btn { margin-bottom: 12px; }
 
     /* Settings */
     .card h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #0f172a; }
@@ -495,12 +516,8 @@
   <!-- History -->
   <div class="tab-pane" id="pane-history">
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div id="historyHeader" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:4px;">
         <h3 style="margin:0;">练习记录</h3>
-        <div>
-          <button class="btn btn-sm btn-outline" onclick="setHistoryFilter('today')" id="filterToday">今天</button>
-          <button class="btn btn-sm btn-primary" onclick="setHistoryFilter('all')" id="filterAll">全部</button>
-        </div>
       </div>
       <div id="historyList"></div>
     </div>
@@ -601,11 +618,9 @@ async function detectServer() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey: 'test' }),
     });
-    // 能连上就算有服务器（即使返回 400 也说明服务器在运行）
-    if (res.status === 400 || res.ok) {
-      useServer = true;
-      showToast('已连接服务器');
-    }
+    // 能连上（不管返回什么状态）就算有服务器
+    useServer = true;
+    showToast('已连接服务器');
   } catch (e) {
     useServer = false;
   }
@@ -629,7 +644,7 @@ function showToast(msg) {
 let currentQuestion = null; // { question, expression, answer, answerType, solution }
 let answered = false;
 let questionStartTime = 0; // 题目开始时间（毫秒时间戳）
-let questionType = 'arithmetic'; // 'arithmetic' | 'matrix'
+let questionType = 'mixed'; // 'mixed' | 'decimal' | 'fraction' | 'matrix' | 'equation'
 
 async function generateQuestion() {
   const apiKey = getApiKey();
@@ -686,6 +701,7 @@ async function generateQuestion() {
 // 浏览器模式直接调用 DeepSeek
 async function callDeepSeekDirect(apiKey, type) {
   if (type === 'matrix') return callDeepSeekDirectMatrix(apiKey);
+  if (type === 'equation') return callDeepSeekDirectEquation(apiKey);
 
   const prompt = `你是一个口算题生成器。请生成一道符合以下全部约束的口算题：
 
@@ -765,7 +781,7 @@ async function callDeepSeekDirectMatrix(apiKey) {
 约束：
 - 矩阵A的维度为 m×n，矩阵B的维度为 n×l
 - m, n, l 各自在 1 到 3 之间
-- 矩阵中的每个数字都是0-9的一位整数，不允许小数或分数
+- 矩阵中的每个数字都是 -10 到 10 之间的整数，不允许小数或分数
 - 结果矩阵的每个元素不能超过3位数字
 
 请严格按以下 JSON 格式返回，不要包含其他内容：
@@ -819,9 +835,79 @@ async function callDeepSeekDirectMatrix(apiKey) {
   return json;
 }
 
+// 浏览器模式：方程组求解
+async function callDeepSeekDirectEquation(apiKey) {
+  const prompt = `你是一个线性方程组出题器。请生成一道线性方程组求解题。
+
+约束：
+- 方程组为二元（2个方程2个未知数）或三元（3个方程3个未知数）
+- 系数矩阵中的每个数字必须在 -10 到 10 之间（整数）
+- 等号右侧的常数项也必须在 -10 到 10 之间（整数）
+- 解向量（未知数的值）必须在 -10 到 10 之间（整数）
+
+解题方法要求：
+- 请使用**行变换（高斯消元）**方法求解，将增广矩阵化为行最简形
+- 解题步骤必须详细，每步写出变换操作（如 R2 = R2 - 2×R1）和当前增广矩阵的状态
+- 最后一步给出单位矩阵和解向量
+
+请严格按以下 JSON 格式返回，不要包含其他内容：
+{
+  "question": "解下列线性方程组",
+  "equations": ["方程1的文本", "方程2的文本"],
+  "matrixA": [[系数矩阵]],
+  "vectorB": [常数项列向量],
+  "variables": ["x", "y"],
+  "numVars": 2,
+  "answer": {"x": 1, "y": 2},
+  "solution": "详细的解题步骤，使用行变换方法，每步单独一行"
+}`;
+
+  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2000,
+    }),
+  });
+
+  if (!res.ok) {
+    return { error: 'API 返回 ' + res.status + '，请检查 API Key' };
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) return { error: 'AI 返回为空' };
+
+  let json;
+  if (content.startsWith('{')) {
+    try { json = JSON.parse(content); } catch (e) {}
+  }
+  if (!json) {
+    const m = content.match(/```(?:json)?\s*\n?(.*?)\n?```/s);
+    if (m) {
+      try { json = JSON.parse(m[1].trim()); } catch (e) {}
+    }
+  }
+  if (!json || !json.equations || !json.matrixA || !json.answer) {
+    return { error: 'AI 返回格式错误，请重试' };
+  }
+  return json;
+}
+
 function renderQuestion() {
   if (!currentQuestion) return;
   const area = document.getElementById('practiceArea');
+
+  if (currentQuestion.questionType === 'equation' || currentQuestion.equations) {
+    renderEquationQuestion();
+    return;
+  }
 
   if (currentQuestion.matrixA && currentQuestion.matrixB) {
     renderMatrixQuestion();
@@ -1025,7 +1111,10 @@ function displayMatrixResult(correct, userMatrix, correctMatrix) {
       '<h3>📖 详细解答</h3>' +
       '<div class="step">' + escapeHtml(currentQuestion.solution || '') + '</div>' +
     '</div>' +
-    '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
+      '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
+    '</div>';
 }
 
 function clientVerifyMatrix(userMatrix, correctMatrix) {
@@ -1036,6 +1125,179 @@ function clientVerifyMatrix(userMatrix, correctMatrix) {
     for (let j = 0; j < userMatrix[i].length; j++) {
       if (parseInt(userMatrix[i][j]) !== parseInt(correctMatrix[i][j])) return false;
     }
+  }
+  return true;
+}
+
+// ============================================================
+// 方程组渲染
+// ============================================================
+function renderEquationQuestion() {
+  if (!currentQuestion) return;
+  const q = currentQuestion;
+  const vars = q.variables || ['x', 'y'];
+  const n = q.numVars || vars.length;
+
+  let html = '<div class="card matrix-area">';
+  html += '<div class="question-text" style="font-size:20px;">' + escapeHtml(q.question || '解下列线性方程组') + '</div>';
+
+  // 显示方程组
+  html += '<div style="text-align:left;margin:16px auto;padding:16px 20px;background:#f8faff;border-radius:var(--radius);border:2px solid #eef2ff;font-size:17px;font-weight:600;line-height:2;display:inline-block;">';
+  (q.equations || []).forEach(function(eq) {
+    html += escapeHtml(eq) + '<br>';
+  });
+  html += '</div>';
+
+  // 输入框
+  html += '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">请输入每个未知数的值</div>';
+  html += '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:16px;">';
+  vars.forEach(function(v, idx) {
+    html += '<div style="display:flex;align-items:center;gap:6px;">' +
+      '<label style="font-size:18px;font-weight:700;color:#1e293b;">' + escapeHtml(v) + ' =</label>' +
+      '<input type="text" id="eq-var-' + idx + '" class="eq-input" data-var="' + escapeHtml(v) + '" style="width:60px;padding:8px 10px;border:2px solid #e2e8f0;border-radius:6px;font-size:18px;font-weight:700;text-align:center;outline:none;background:#f8fafc;" maxlength="4" autocomplete="off">' +
+      '</div>';
+  });
+  html += '</div>';
+
+  html += '<div><button class="btn btn-success" id="submitBtn" onclick="submitEquationAnswer()">提交</button></div>';
+  html += '<div id="resultArea"></div>';
+  html += '</div>';
+
+  document.getElementById('practiceArea').innerHTML = html;
+
+  // 聚焦第一个输入框
+  const firstInput = document.querySelector('.eq-input');
+  if (firstInput) firstInput.focus();
+}
+
+function collectEquationAnswer() {
+  const vars = currentQuestion.variables || ['x', 'y'];
+  const result = {};
+  vars.forEach(function(v, idx) {
+    const input = document.getElementById('eq-var-' + idx);
+    result[v] = input ? input.value.trim() : '';
+  });
+  return result;
+}
+
+async function submitEquationAnswer() {
+  if (!currentQuestion || answered) return;
+
+  const userAnswer = collectEquationAnswer();
+  const vars = currentQuestion.variables || ['x', 'y'];
+
+  // 检查是否全部填写
+  for (var i = 0; i < vars.length; i++) {
+    if (userAnswer[vars[i]] === '') {
+      showToast('请填写所有未知数的值');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '核验中...';
+
+  let correct = false;
+  let exactAnswer = null;
+
+  if (useServer) {
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionType: 'equation',
+          correctAnswer: currentQuestion.answer,
+          userAnswer: userAnswer,
+          variables: vars,
+        }),
+      });
+      const data = await res.json();
+      correct = data.correct;
+      exactAnswer = data.exactAnswer || currentQuestion.answer;
+    } catch (e) {
+      correct = clientVerifyEquation(userAnswer, currentQuestion.answer, vars);
+    }
+  } else {
+    correct = clientVerifyEquation(userAnswer, currentQuestion.answer, vars);
+  }
+
+  answered = true;
+  const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
+
+  // 保存记录
+  const records = loadRecords();
+  records.push({
+    id: Date.now() + Math.random(),
+    question: (currentQuestion.equations || ['方程组']).join('; '),
+    expression: JSON.stringify({ matrixA: currentQuestion.matrixA, vectorB: currentQuestion.vectorB }),
+    userAnswer: JSON.stringify(userAnswer),
+    correctAnswer: JSON.stringify(exactAnswer),
+    correct: correct,
+    speedSec: elapsedSec,
+    timestamp: new Date().toISOString(),
+    questionType: 'equation',
+  });
+  saveRecords(records);
+
+  // 显示结果
+  displayEquationResult(correct, userAnswer, exactAnswer || currentQuestion.answer, vars);
+
+  btn.textContent = '已提交';
+  updateStats();
+}
+
+function displayEquationResult(correct, userAnswer, correctAnswer, vars) {
+  const resultArea = document.getElementById('resultArea');
+
+  let userStr = vars.map(function(v) { return v + '=' + (userAnswer[v] || '?'); }).join(', ');
+  let correctStr = vars.map(function(v) { return v + '=' + (correctAnswer[v] || '?'); }).join(', ');
+
+  if (correct) {
+    resultArea.innerHTML =
+      '<div class="result-badge correct">✅ 正确！</div>' +
+      '<div style="font-size:16px;font-weight:700;color:var(--success);margin:8px 0;">' + escapeHtml(correctStr) + '</div>';
+  } else {
+    resultArea.innerHTML =
+      '<div class="result-badge wrong">❌ 错误</div>' +
+      '<div style="font-size:14px;color:#64748b;margin-bottom:8px;">你的答案: <strong style="color:#EF4444;">' + escapeHtml(userStr) + '</strong></div>' +
+      '<div style="font-size:14px;color:#64748b;margin-bottom:8px;">正确答案: <strong style="color:var(--success);">' + escapeHtml(correctStr) + '</strong></div>';
+  }
+
+  // 逐个输入框高亮
+  vars.forEach(function(v, idx) {
+    const input = document.getElementById('eq-var-' + idx);
+    if (input) {
+      if ((input.value.trim()) === '' + (correctAnswer[v] !== undefined ? correctAnswer[v] : '')) {
+        input.style.borderColor = 'var(--success)';
+        input.style.background = '#f0fdf4';
+      } else {
+        input.style.borderColor = 'var(--danger)';
+        input.style.background = '#fef2f2';
+      }
+    }
+  });
+
+  // solution + 下一题/结束
+  resultArea.innerHTML +=
+    '<div class="solution-box">' +
+      '<h3>📖 详细解答（行变换）</h3>' +
+      '<div class="step">' + escapeHtml(currentQuestion.solution || '') + '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
+      '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
+    '</div>';
+}
+
+function clientVerifyEquation(userAnswer, correctAnswer, variables) {
+  if (!userAnswer || !correctAnswer) return false;
+  for (var i = 0; i < variables.length; i++) {
+    var v = variables[i];
+    var ua = parseInt(userAnswer[v]);
+    var ca = parseInt(correctAnswer[v]);
+    if (isNaN(ua) || isNaN(ca) || ua !== ca) return false;
   }
   return true;
 }
@@ -1094,6 +1356,7 @@ async function submitAnswer() {
     correct: correct,
     speedSec: elapsedSec,
     timestamp: new Date().toISOString(),
+    questionType: currentQuestion.questionType || questionType,
   });
   saveRecords(records);
 
@@ -1109,7 +1372,10 @@ async function submitAnswer() {
         '<h3>📖 详细解答</h3>' +
         '<div class="step">' + escapeHtml(currentQuestion.solution) + '</div>' +
       '</div>' +
-      '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+      '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
+        '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
+        '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
+      '</div>';
   } else {
     inputEl.className = 'wrong';
     resultArea.innerHTML =
@@ -1119,7 +1385,10 @@ async function submitAnswer() {
         '<h3>📖 详细解答</h3>' +
         '<div class="step">' + escapeHtml(currentQuestion.solution) + '</div>' +
       '</div>' +
-      '<button class="btn btn-primary" style="margin-top:12px;" onclick="generateQuestion()">下一题 →</button>';
+      '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
+        '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
+        '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
+      '</div>';
   }
 
   btn.textContent = '已提交';
@@ -1221,42 +1490,121 @@ async function syncStatsToServer(today, total, correct, speedRecords) {
 }
 
 // ============================================================
-// 历史
+// 历史（按日期查看）
 // ============================================================
-let historyFilter = 'all';
-
-function setHistoryFilter(filter) {
-  historyFilter = filter;
-  document.getElementById('filterToday').className = 'btn btn-sm ' + (filter === 'today' ? 'btn-primary' : 'btn-outline');
-  document.getElementById('filterAll').className = 'btn btn-sm ' + (filter === 'all' ? 'btn-primary' : 'btn-outline');
-  renderHistory();
-}
+let historyDate = null; // null = 显示日期列表, '2026-06-08' = 显示该日详情
 
 function renderHistory() {
   const list = document.getElementById('historyList');
-  let records = loadRecords();
-
-  if (historyFilter === 'today') {
-    const today = new Date().toISOString().slice(0, 10);
-    records = records.filter(r => r.timestamp && r.timestamp.slice(0, 10) === today);
-  }
-
-  // 按时间倒序
-  records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const header = document.getElementById('historyHeader');
+  const records = loadRecords();
 
   if (records.length === 0) {
     list.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>还没有练习记录</p></div>';
+    if (header) header.innerHTML = '<h3 style="margin:0;">练习记录</h3>';
     return;
   }
 
-  list.innerHTML = records.map(r => {
+  if (historyDate === null) {
+    // 日期列表视图
+    renderDateList(list, records, header);
+  } else {
+    // 某日详情视图
+    renderDateDetail(list, records, header);
+  }
+}
+
+function renderDateList(list, records, header) {
+  if (header) header.innerHTML = '<h3 style="margin:0;">练习记录</h3>';
+
+  // 按日期分组
+  const days = {};
+  records.forEach(function(r) {
+    const d = r.timestamp ? r.timestamp.slice(0, 10) : 'unknown';
+    if (!days[d]) days[d] = { total: 0, correct: 0, speeds: [] };
+    days[d].total++;
+    if (r.correct) days[d].correct++;
+    if (r.speedSec != null) days[d].speeds.push(r.speedSec);
+  });
+
+  // 按日期倒序排列
+  const sortedDays = Object.keys(days).sort().reverse();
+
+  // 本周几映射
+  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  list.innerHTML = '<div class="date-list">' +
+    sortedDays.map(function(d) {
+      const day = days[d];
+      const acc = day.total > 0 ? Math.round(day.correct / day.total * 100) + '%' : '--';
+      const avg = day.speeds.length > 0 ? Math.round(day.speeds.reduce(function(a, b) { return a + b; }, 0) / day.speeds.length) + 's' : '--';
+      const dt = new Date(d + 'T00:00:00');
+      const weekday = weekDays[dt.getDay()];
+      const isToday = d === new Date().toISOString().slice(0, 10);
+      return '<div class="date-item" onclick="viewDate(\'' + d + '\')">' +
+        '<div class="d-left">' +
+          '<div>' +
+            '<div class="d-date">' + d + (isToday ? ' <span style="font-size:11px;color:var(--primary);">今天</span>' : '') + '</div>' +
+            '<div class="d-weekday">' + weekday + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="d-stats">' +
+          '<span>' + day.total + ' 题</span>' +
+          '<span>正确率 ' + acc + '</span>' +
+          '<span>平均 ' + avg + '</span>' +
+        '</div>' +
+        '<div class="d-arrow">›</div>' +
+      '</div>';
+    }).join('') +
+    '</div>';
+}
+
+function viewDate(dateStr) {
+  historyDate = dateStr;
+  renderHistory();
+}
+
+function backToDateList() {
+  historyDate = null;
+  renderHistory();
+}
+
+function renderDateDetail(list, records, header) {
+  const dayRecords = records.filter(function(r) {
+    return r.timestamp && r.timestamp.slice(0, 10) === historyDate;
+  }).sort(function(a, b) {
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
+
+  const total = dayRecords.length;
+  const correct = dayRecords.filter(function(r) { return r.correct; }).length;
+  const acc = total > 0 ? Math.round(correct / total * 100) + '%' : '--';
+  const speeds = dayRecords.filter(function(r) { return r.speedSec != null; }).map(function(r) { return r.speedSec; });
+  const avg = speeds.length > 0 ? Math.round(speeds.reduce(function(a, b) { return a + b; }, 0) / speeds.length) + 's' : '--';
+
+  if (header) {
+    header.innerHTML =
+      '<button class="btn btn-sm btn-outline back-btn" onclick="backToDateList()">← 返回</button>' +
+      '<h3 style="margin:4px 0 2px;">' + historyDate + '</h3>' +
+      '<div style="font-size:13px;color:#64748b;">共 ' + total + ' 题 · 正确率 ' + acc + ' · 平均 ' + avg + '</div>';
+  }
+
+  if (dayRecords.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">📝</div><p>该日没有记录</p></div>';
+    return;
+  }
+
+  const typeLabels = { mixed: '混合', decimal: '小数', fraction: '分数', matrix: '矩阵', equation: '方程组' };
+
+  list.innerHTML = dayRecords.map(function(r) {
     const time = new Date(r.timestamp);
     const timeStr = pad(time.getHours()) + ':' + pad(time.getMinutes()) + ':' + pad(time.getSeconds());
+    const qtype = r.questionType || 'mixed';
     return '<div class="history-item">' +
       '<div class="history-icon">' + (r.correct ? '✅' : '❌') + '</div>' +
       '<div class="history-body">' +
-        '<div class="h-question">' + escapeHtml(r.question || r.expression || '') + ' ' +
-          (r.questionType === 'matrix' ? '<span style="font-size:11px;color:#6B8AFF;font-weight:600;">[矩阵]</span>' : '') +
+        '<div class="h-question">' + escapeHtml(r.question || r.expression || '') +
+          '<span class="h-type">' + (typeLabels[qtype] || qtype) + '</span>' +
         '</div>' +
         '<div class="h-detail">' +
           '你的答案: <strong>' + escapeHtml(r.userAnswer) + '</strong>' +
@@ -1348,9 +1696,32 @@ function setQuestionType(type, btn) {
   questionType = type;
   document.querySelectorAll('.type-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  // 更新提示文字
+  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组' };
   const p = document.querySelector('.question-area p');
-  if (p) p.textContent = '点击下方按钮，AI 将为你生成一道' + (type === 'matrix' ? '矩阵乘法题' : '口算题');
+  if (p) p.textContent = '点击下方按钮，AI 将为你生成一道' + (labels[type] || '口算题');
+}
+
+function endPractice() {
+  currentQuestion = null;
+  answered = false;
+  showHomeScreen();
+}
+
+function showHomeScreen() {
+  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组' };
+  const area = document.getElementById('practiceArea');
+  area.innerHTML =
+    '<div class="card question-area" style="padding:48px 20px;">' +
+      '<div class="type-selector">' +
+        Object.keys(labels).map(function(k) {
+          return '<button class="type-btn' + (questionType === k ? ' active' : '') + '" data-type="' + k + '" onclick="setQuestionType(\'' + k + '\', this)">' + labels[k] + '</button>';
+        }).join('') +
+      '</div>' +
+      '<div style="font-size:48px;margin-bottom:16px;">🧮</div>' +
+      '<p style="font-size:16px;color:#64748b;margin-bottom:20px;">点击下方按钮，AI 将为你生成一道' + (labels[questionType] || '口算题') + '</p>' +
+      '<button class="btn btn-primary" style="font-size:16px;padding:14px 36px;" onclick="generateQuestion()">生成题目</button>' +
+    '</div>';
+  updateStats();
 }
 
 function refreshAll() {
@@ -1373,17 +1744,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // 初始状态：显示生成按钮和类型选择
-  const area = document.getElementById('practiceArea');
-  area.innerHTML =
-    '<div class="card question-area" style="padding:48px 20px;">' +
-      '<div class="type-selector">' +
-        '<button class="type-btn active" data-type="arithmetic" onclick="setQuestionType(\'arithmetic\', this)">口算题</button>' +
-        '<button class="type-btn" data-type="matrix" onclick="setQuestionType(\'matrix\', this)">矩阵乘法</button>' +
-      '</div>' +
-      '<div style="font-size:48px;margin-bottom:16px;">🧮</div>' +
-      '<p style="font-size:16px;color:#64748b;margin-bottom:20px;">点击下方按钮，AI 将为你生成一道' + (questionType === 'matrix' ? '矩阵乘法题' : '口算题') + '</p>' +
-      '<button class="btn btn-primary" style="font-size:16px;padding:14px 36px;" onclick="generateQuestion()">生成题目</button>' +
-    '</div>';
+  showHomeScreen();
 
   updateStats();
   detectServer();
