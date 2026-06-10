@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import re
+import random
 import urllib.request
 import urllib.error
 from fractions import Fraction
@@ -37,13 +38,157 @@ def save_stats(data: dict):
         print(f'[Stats] 写入失败: {e}', file=sys.stderr)
 
 
+QUESTION_HISTORY_MAX = 500
+
+
+def _answer_fingerprint(answer, qtype: str) -> str:
+    """将答案规范化为字符串指纹，用于去重比较"""
+    if qtype in ('matrix', 'inverse'):
+        return json.dumps(answer)
+    if qtype == 'equation':
+        return json.dumps(answer, sort_keys=True)
+    return str(answer).strip()
+
+
+def _question_fingerprint(question_data: dict, qtype: str) -> str:
+    """根据题目数据生成唯一指纹（用于矩阵/方程/逆矩阵等结构化题型）"""
+    if qtype == 'matrix':
+        return json.dumps({'A': question_data.get('matrixA'), 'B': question_data.get('matrixB')}, sort_keys=True)
+    if qtype == 'equation':
+        return json.dumps({'A': question_data.get('matrixA'), 'b': question_data.get('vectorB')}, sort_keys=True)
+    if qtype == 'inverse':
+        return json.dumps({'A': question_data.get('matrixA')}, sort_keys=True)
+    # 口算题直接用题目文本
+    return question_data.get('question', '')
+
+
+def load_question_history() -> list:
+    """从 stats 文件中加载题目历史"""
+    stats = load_stats()
+    return stats.get('questionHistory', [])
+
+
+def save_question_to_history(question_data: dict, qtype: str):
+    """将一道题目存入历史记录"""
+    stats = load_stats()
+    history = stats.get('questionHistory', [])
+    entry = {
+        'questionText': question_data.get('question', ''),
+        'answer': _answer_fingerprint(question_data.get('answer', ''), qtype),
+        'dataFingerprint': _question_fingerprint(question_data, qtype),
+        'questionType': qtype,
+    }
+    history.append(entry)
+    if len(history) > QUESTION_HISTORY_MAX:
+        history = history[-QUESTION_HISTORY_MAX:]
+    stats['questionHistory'] = history
+    save_stats(stats)
+
+
+def is_duplicate_question(question_data: dict, qtype: str, history: list) -> bool:
+    """检查题目是否和历史记录中的题目重复
+
+    去重规则：
+    1. 数据指纹相同 → 重复（矩阵A和B、方程组系数等结构化数据）
+    2. 答案相同 → 重复（算术题计算结果相同、矩阵乘积结果相同）
+    3. 题目文本相同 → 重复（仅对算术口算题有效，结构化题型的文本是固定模板）
+    """
+    if not history:
+        return False
+    q_text = question_data.get('question', '')
+    q_ans = _answer_fingerprint(question_data.get('answer', ''), qtype)
+    q_fp = _question_fingerprint(question_data, qtype)
+    is_structured = qtype in ('matrix', 'equation', 'inverse')
+    for entry in history:
+        # 数据指纹相同（结构化题型：矩阵/方程组等） → 重复
+        if q_fp and entry.get('dataFingerprint') == q_fp:
+            return True
+        # 答案相同 → 重复
+        if q_ans and entry.get('answer') == q_ans:
+            return True
+        # 题目文本相同（仅对算术口算题有效）
+        if not is_structured and q_text and entry.get('questionText') == q_text:
+            return True
+    return False
+
+
+def _to_frac_matrix(m):
+    """将字符串矩阵（list of list of str）转为 Fraction 矩阵"""
+    return [[Fraction(x) for x in row] for row in m]
+
+
+def _to_frac_vector(v):
+    """将字符串向量转为 Fraction 列表（兼容 1D 和 2D）"""
+    if not v:
+        return []
+    if isinstance(v[0], list):
+        # 2D 向量（逆矩阵右侧 I 矩阵）
+        return [[Fraction(x) for x in row] for row in v]
+    # 1D 向量（方程组右侧常数项）
+    return [Fraction(x) for x in v]
+
+
+def _rebuild_full_augmented(step, is_inverse):
+    """将 step.augmented 重建为完整增广矩阵（Fraction）， shape 为 n × (n + right_cols)"""
+    n = len(step['augmented']['matrix'])
+    left = _to_frac_matrix(step['augmented']['matrix'])
+    right = step['augmented']['vector']
+    if is_inverse:
+        # 2D: 右侧也是 n×n 矩阵
+        right_mat = _to_frac_matrix(right)
+        return [left[i] + right_mat[i] for i in range(n)]
+    else:
+        # 1D: 右侧是 n 维列向量
+        right_vec = _to_frac_vector(right)
+        return [left[i] + [right_vec[i]] for i in range(n)]
+
+
+def verify_steps_consistency(steps):
+    """验证 solutionSteps 中每步的左乘矩阵和中间结果是否一致
+
+    检查：leftMatrix[step] × augmented[step-1] == augmented[step]
+    返回 (是否全部正确, 错误信息)
+    """
+    if not steps or len(steps) < 2:
+        return True, ''
+
+    # 判断是否为逆矩阵题型（augmented.vector 是 2D 而非 1D）
+    is_inverse = bool(steps[0].get('augmented', {}).get('vector', []) and
+                      isinstance(steps[0]['augmented']['vector'][0], list))
+
+    for i in range(1, len(steps)):
+        prev = steps[i - 1]
+        curr = steps[i]
+
+        left = _to_frac_matrix(curr['leftMatrix'])
+        prev_aug = _rebuild_full_augmented(prev, is_inverse)
+        curr_aug = _rebuild_full_augmented(curr, is_inverse)
+
+        n = len(left)
+        # 矩阵乘法：left (n×n) × prev_aug (n×m) = result (n×m)
+        m = len(prev_aug[0])
+        computed = [[Fraction(0) for _ in range(m)] for _ in range(n)]
+        for r in range(n):
+            for c in range(m):
+                for k in range(n):
+                    computed[r][c] += left[r][k] * prev_aug[k][c]
+
+        # 逐元素比较
+        for r in range(n):
+            for c in range(m):
+                if computed[r][c] != curr_aug[r][c]:
+                    return False, (f'步骤 {i+1} ("{curr["operation"]}") 验证失败: '
+                                   f'位置 [{r},{c}] 期望 {curr_aug[r][c]}，计算得 {computed[r][c]}')
+    return True, ''
+
+
 def call_deepseek(api_key: str, prompt: str) -> str | None:
     """调用 DeepSeek API 并返回文本内容"""
     data = json.dumps({
         "model": "deepseek-chat",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7,
-        "max_tokens": 1000,
+        "max_tokens": 4096,
     }).encode('utf-8')
 
     req = urllib.request.Request(
@@ -65,22 +210,55 @@ def call_deepseek(api_key: str, prompt: str) -> str | None:
         return None
 
 
+def _repair_json_fractions(text: str) -> str:
+    """修复 JSON 中未用引号包裹的分数（如 -1/3 → "-1/3"）"""
+    # 匹配值位置的分数 pattern: 在 : 或 [ 或 , 之后，在 , 或 ] 或 } 之前
+    # 如 : -1/3  或  , 2/3  或  [-1/3,  等
+    text = re.sub(
+        r'(?<=[:,\[])\s*(-?\d+/\d+)\s*(?=[,\}\]])',
+        r'"\1"',
+        text
+    )
+    return text
+
+
 def parse_json_from_response(text: str) -> dict | None:
     """从 AI 返回文本中提取 JSON 对象"""
-    # 尝试直接解析
     text = text.strip()
-    if text.startswith('{') and text.endswith('}'):
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
+
+    def try_parse(t):
+        if t.startswith('{') and t.endswith('}'):
+            try:
+                return json.loads(t)
+            except json.JSONDecodeError:
+                pass
+        return None
+
+    # 尝试直接解析
+    result = try_parse(text)
+    if result:
+        return result
+
+    # 尝试修复分数后解析
+    repaired = _repair_json_fractions(text)
+    if repaired != text:
+        result = try_parse(repaired)
+        if result:
+            return result
+
     # 尝试从 ```json ... ``` 中提取
     m = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
     if m:
-        try:
-            return json.loads(m.group(1).strip())
-        except json.JSONDecodeError:
-            pass
+        result = try_parse(m.group(1).strip())
+        if result:
+            return result
+        # 也尝试修复后解析
+        repaired_m = _repair_json_fractions(m.group(1).strip())
+        if repaired_m != m.group(1).strip():
+            result = try_parse(repaired_m)
+            if result:
+                return result
+
     return None
 
 
@@ -579,48 +757,51 @@ FRACTION_PROMPT = """你是一个分数计算题出题器。请生成一道**必
   "solution": "详细的解题步骤，用中文，分步说明，每步单独一行"
 }"""
 
-EQUATION_PROMPT = """你是一个线性方程组出题器。请生成一道线性方程组求解题。
+EQUATION_PROMPT = """你是一个线性方程组出题器。请生成一道{n}元线性方程组求解题。
 
-约束：
-- 方程组为二元（2个方程2个未知数）或三元（3个方程3个未知数）
-- 系数矩阵中的每个数字必须在 -10 到 10 之间（整数）
-- 等号右侧的常数项也必须在 -10 到 10 之间（整数）
-- 解向量（未知数的值）必须在 -10 到 10 之间（整数）
+请按以下步骤设计：
+1. 确定解向量：选择 {n} 个整数 x1, x2, ..., x{n}，每个在 -5 到 5 之间
+2. 构造系数矩阵 A：一个 {n}×{n} 矩阵，每个元素为 -5 到 5 之间的整数
+3. 矩阵 A 必须可逆（行列式不为零）
 
-解题方法要求：
-- 请使用**行变换（高斯消元）**方法求解，将增广矩阵化为行最简形
-- 解题步骤必须详细，每步写出变换操作（如 R2 = R2 - 2×R1）和当前增广矩阵的状态
-- 最后一步给出单位矩阵和解向量
+注意事项：
+- 解向量各元素是小的整数（-5 到 5）
+- 系数矩阵各元素也是小的整数（-5 到 5）
+- 等号右侧的常数项由系统自动计算，你不需要提供
 
 请严格按以下 JSON 格式返回，不要包含其他内容：
-{
+{{
   "question": "解下列线性方程组",
-  "equations": ["方程1的文本", "方程2的文本", "方程3的文本"],
-  "matrixA": [[系数矩阵, 如 [[2,1], [1,-1]]]],
-  "vectorB": [常数项列向量, 如 [5, 3]],
-  "variables": ["未知数符号列表, 如 ['x','y'] 或 ['x','y','z']"],
-  "numVars": 2,
-  "answer": {"x": 1, "y": 2},
+  "equations": ["方程1的文本", "方程2的文本" {extra_eq}],
+  "matrixA": [[系数矩阵]],
+  "variables": {variables_list},
+  "numVars": {n},
+  "answer": {answer_example},
   "solution": "详细的解题步骤，使用行变换方法，每步单独一行，包含变换操作说明"
-}"""
+}}"""
 
 
-INVERSE_MATRIX_PROMPT = """你是一个矩阵求逆出题器。请生成一道矩阵求逆题。
+INVERSE_MATRIX_PROMPT = """你是一个矩阵求逆出题器。请生成一道{n}×{n}矩阵求逆题。
 
 约束：
-- 生成一个 n×n 方阵 A，其中 n=2 或 n=3
+- 生成一个 {n}×{n} 方阵 A
 - 矩阵中的每个数字都是 -5 到 5 之间的整数（不要小数或分数）
 - 矩阵必须可逆（行列式不为零）
 - 逆矩阵的元素可能是分数
 
+重要——JSON 格式要求：
+- "answer" 字段中的矩阵元素，如果是分数必须用**引号包裹成字符串**（如 "1/3"），不能写成 1/3
+- 整数不用引号（如 2）
+- 例如正确答案是 [[1/3, 0], [0, 1/2]] 时，应写成 [["1/3", 0], [0, "1/2"]]
+
 请严格按以下 JSON 格式返回，不要包含其他内容：
-{
+{{
   "question": "求矩阵 A 的逆矩阵",
   "matrixA": [[矩阵的每一行]],
-  "size": 2,
-  "answer": [[逆矩阵的每一行]],
+  "size": {n},
+  "answer": [[逆矩阵的每一行（分数用引号包裹）]],
   "solution": "详细的解题步骤，使用行变换方法 [A|I] → [I|A^(-1)]，每步单独一行"
-}"""
+}}"""
 
 
 def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None:
@@ -641,12 +822,22 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
     elif question_type == 'fraction':
         prompt = FRACTION_PROMPT
     elif question_type == 'equation':
-        prompt = EQUATION_PROMPT
+        n = random.choice([2, 3])
+        print(f'[equation] 随机选择维度: {n}元')
+        variables_list = json.dumps(['x', 'y'] if n == 2 else ['x', 'y', 'z'])
+        answer_example = json.dumps({'x': 1, 'y': 2} if n == 2 else {'x': 1, 'y': 2, 'z': 3})
+        extra_eq = '' if n == 2 else ', "方程3的文本"'
+        prompt = EQUATION_PROMPT.format(n=n, extra_eq=extra_eq, variables_list=variables_list, answer_example=answer_example)
     elif question_type == 'inverse':
-        prompt = INVERSE_MATRIX_PROMPT
+        n = random.choice([2, 3])
+        print(f'[inverse] 随机选择维度: {n}×{n}')
+        prompt = INVERSE_MATRIX_PROMPT.format(n=n)
     else:
         prompt = SYSTEM_PROMPT
-    for attempt in range(3):
+    max_attempts = 3
+    if question_type in ('equation', 'inverse', 'matrix'):
+        max_attempts = 5
+    for attempt in range(max_attempts):
         print(f'[{question_type}] 尝试生成第 {attempt + 1} 次...')
         raw = call_deepseek(api_key, prompt)
         if not raw:
@@ -654,6 +845,7 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
 
         data = parse_json_from_response(raw)
         if not data:
+            print(f'[{question_type}] 无法解析 AI 响应（前200字符）: {raw[:200]}')
             continue
 
         if question_type == 'matrix':
@@ -715,6 +907,13 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
                         continue
 
             print(f'[matrix] 生成成功: {rows}×{inner_dim} · {inner_dim}×{cols}')
+            # 去重检查
+            question_data = {'question': question, 'answer': answer, 'matrixA': matrix_a, 'matrixB': matrix_b}
+            history = load_question_history()
+            if is_duplicate_question(question_data, 'matrix', history):
+                print(f'[matrix] 与历史记录重复，重新生成')
+                continue
+            save_question_to_history(question_data, 'matrix')
             return {
                 'questionType': 'matrix',
                 'question': question,
@@ -731,14 +930,13 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
         if question_type == 'equation':
             equations = data.get('equations', [])
             matrix_a = data.get('matrixA')
-            vector_b = data.get('vectorB')
             variables = data.get('variables', [])
             num_vars = data.get('numVars', 0)
             answer = data.get('answer', {})
             solution = data.get('solution', '').strip()
 
-            if not all([equations, matrix_a, vector_b, variables, num_vars, answer, solution]):
-                print(f'[equation] 字段不完整，跳过')
+            if not all([equations, matrix_a, variables, num_vars, answer, solution]):
+                print(f'[equation] 字段不完整（equations/matrixA/variables/numVars/answer/solution），跳过')
                 continue
 
             if num_vars not in (2, 3):
@@ -749,61 +947,74 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
                 print(f'[equation] 方程数量不匹配，跳过')
                 continue
 
-            # 验证所有数字在 -10 到 10
+            # 验证系数矩阵元素在 -5 到 5 之间
             val_ok = True
             for row in matrix_a:
+                if len(row) != num_vars:
+                    print(f'[equation] 系数矩阵列数不匹配，跳过')
+                    val_ok = False
+                    break
                 for val in row:
-                    if not isinstance(val, int) or val < -10 or val > 10:
-                        print(f'[equation] 系数 {val} 超出范围，跳过')
+                    if not isinstance(val, int) or val < -5 or val > 5:
+                        print(f'[equation] 系数 {val} 超出范围（-5~5），跳过')
                         val_ok = False
                         break
                 if not val_ok:
                     break
             if not val_ok:
                 continue
-            for val in vector_b:
-                if not isinstance(val, int) or val < -10 or val > 10:
-                    print(f'[equation] 常数项 {val} 超出范围，跳过')
-                    val_ok = False
-                    break
-            if not val_ok:
-                continue
 
-            # 验证解向量的值也在范围内
+            # 验证答案（解向量）为整数且在 -5 到 5 之间
+            val_ok = True
             for var in variables:
                 val = answer.get(var)
-                if val is None or not isinstance(val, int) or val < -10 or val > 10:
-                    print(f'[equation] 解 {var}={val} 超出范围，跳过')
+                if val is None or not isinstance(val, int) or val < -5 or val > 5:
+                    print(f'[equation] 解 {var}={val} 超出范围（-5~5），跳过')
+                    val_ok = False
+                    break
+            if not val_ok:
+                continue
+            if len(answer) != num_vars:
+                print(f'[equation] 解向量长度不匹配，跳过')
+                continue
+
+            # 由服务器计算 b = A × solution（保证数学正确）
+            var_list = variables
+            n = num_vars
+            vector_b = [sum(matrix_a[i][j] * answer[var_list[j]] for j in range(n)) for i in range(n)]
+
+            # 验证常数项在合理范围内
+            val_ok = True
+            for val in vector_b:
+                if val < -100 or val > 100:
+                    print(f'[equation] 常数项 {val} 超出范围（-100~100），跳过')
                     val_ok = False
                     break
             if not val_ok:
                 continue
 
-            # 验证解的正确性：A × x == b
-            var_list = variables
-            n = num_vars
-            computed_b = [sum(matrix_a[i][j] * answer[var_list[j]] for j in range(n)) for i in range(n)]
-            if computed_b != vector_b:
-                print(f'[equation] AI 给出的解不正确，跳过')
-                continue
+            print(f'[equation] 验证通过，使用服务端高斯消元生成步骤')
 
-            print(f'[equation] 生成成功: {num_vars}元方程组')
-
-            # 使用服务端高斯消元生成解题步骤（包含左乘矩阵）
+            # 使用服务端高斯消元生成解题步骤
             try:
                 elim_result = gaussian_elimination_steps(matrix_a, vector_b)
-                # 变量名标准化：AI 可能用 x,y 或 x,y,z，映射到通用 x1,x2...
-                var_map = {}
-                for i, v in enumerate(variables):
-                    var_map[f'x{i+1}'] = v
-                mapped_steps = []
-                for step in elim_result['steps']:
-                    mapped_steps.append(step)
-                solution_steps = mapped_steps
+                solution_steps = elim_result['steps']
+                # 验证每步的左乘矩阵与中间结果：左乘矩阵 × 上一增广矩阵 = 当前增广矩阵
+                steps_ok, err_msg = verify_steps_consistency(solution_steps)
+                if not steps_ok:
+                    print(f'[equation] {err_msg}，跳过')
+                    continue
             except Exception as e:
-                print(f'[equation] 高斯消元出错: {e}，回退到 AI 生成的文本', file=sys.stderr)
-                solution_steps = None
+                print(f'[equation] 高斯消元出错: {e}，跳过', file=sys.stderr)
+                continue
 
+            # 去重检查
+            question_data = {'question': '解下列线性方程组', 'answer': answer, 'matrixA': matrix_a, 'vectorB': vector_b}
+            history = load_question_history()
+            if is_duplicate_question(question_data, 'equation', history):
+                print(f'[equation] 与历史记录重复，重新生成')
+                continue
+            save_question_to_history(question_data, 'equation')
             return {
                 'questionType': 'equation',
                 'question': '解下列线性方程组',
@@ -849,13 +1060,20 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
             if not val_ok:
                 continue
 
-            # 验证 AI 给出的逆矩阵是否正确：A × A_inv = I
+            # 验证 AI 给出的逆矩阵是否正确：A × A_inv = I（支持分数字符串）
             n = size
-            computed_inv_prod = [[sum(matrix_a[i][k] * answer[k][j] for k in range(n)) for j in range(n)] for i in range(n)]
-            is_identity = all(
-                computed_inv_prod[i][j] == (1 if i == j else 0)
-                for i in range(n) for j in range(n)
-            )
+            try:
+                answer_frac = []
+                for row in answer:
+                    answer_frac.append([Fraction(x) for x in row])
+                computed_inv_prod = [[sum(matrix_a[i][k] * answer_frac[k][j] for k in range(n)) for j in range(n)] for i in range(n)]
+                is_identity = all(
+                    abs(computed_inv_prod[i][j] - (1 if i == j else 0)) < Fraction(1, 1000000)
+                    for i in range(n) for j in range(n)
+                )
+            except Exception as e:
+                print(f'[inverse] AI 逆矩阵验证出错: {e}，跳过')
+                continue
             if not is_identity:
                 print(f'[inverse] AI 给出的逆矩阵不正确，使用服务端计算')
                 # 不跳过，让服务端矫正
@@ -867,6 +1085,11 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
                 inv_result = gaussian_elimination_inverse_steps(matrix_a)
                 solution_steps = inv_result['steps']
                 server_inverse = inv_result['inverse']
+                # 验证每步的左乘矩阵与中间结果
+                steps_ok, err_msg = verify_steps_consistency(solution_steps)
+                if not steps_ok:
+                    print(f'[inverse] {err_msg}，跳过')
+                    continue
             except Exception as e:
                 print(f'[inverse] 高斯消元求逆出错: {e}，回退到 AI 生成的文本', file=sys.stderr)
                 solution_steps = None
@@ -875,6 +1098,13 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
             # 使用服务端计算的逆矩阵作为正确答案（更可靠）
             final_answer = server_inverse if server_inverse else answer
 
+            # 去重检查
+            question_data = {'question': '求矩阵 A 的逆矩阵', 'answer': final_answer, 'matrixA': matrix_a}
+            history = load_question_history()
+            if is_duplicate_question(question_data, 'inverse', history):
+                print(f'[inverse] 与历史记录重复，重新生成')
+                continue
+            save_question_to_history(question_data, 'inverse')
             return {
                 'questionType': 'inverse',
                 'question': f'求矩阵 A 的逆矩阵',
@@ -939,6 +1169,13 @@ def generate_question(api_key: str, question_type: str = 'mixed') -> dict | None
             server_answer = str(int(result))
 
         print(f'[Question] 生成成功: {question}')
+        # 去重检查
+        question_data = {'question': question, 'answer': server_answer}
+        history = load_question_history()
+        if is_duplicate_question(question_data, 'arithmetic', history):
+            print(f'[Question] 与历史记录重复，重新生成')
+            continue
+        save_question_to_history(question_data, 'arithmetic')
         return {
             'question': question,
             'expression': expression,
