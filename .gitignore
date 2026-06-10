@@ -6,5 +6,5 @@ stats-data.json
 __pycache__/
 *.pyc
 
-# 编辑器本地配置（如果需要完全隐藏可以取消下面这行的注释）
-# .vscode/settings.json
+# 编辑器本地配置（每人不同，不提交）
+.vscode/settings.json
