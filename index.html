@@ -622,7 +622,7 @@
       <div style="font-size:13px;color:#64748b;line-height:2;">
         <p>AI 口算练习 v1.0</p>
         <p>由 AI 生成自定义口算题，附带详细解题步骤。</p>
-        <p>题目支持：整数、小数、分数、四则混合运算。</p>
+        <p>题目支持：整数、小数、分数、矩阵乘法、方程组、逆矩阵。</p>
         <p>数据保存在浏览器本地，可导出备份。</p>
       </div>
     </div>
@@ -730,7 +730,7 @@ function showToast(msg) {
 let currentQuestion = null; // { question, expression, answer, answerType, solution }
 let answered = false;
 let questionStartTime = 0; // 题目开始时间（毫秒时间戳）
-let questionType = 'mixed'; // 'mixed' | 'decimal' | 'fraction' | 'matrix' | 'equation'
+let questionType = 'mixed'; // 'mixed' | 'decimal' | 'fraction' | 'matrix' | 'equation' | 'inverse'
 
 async function generateQuestion() {
   // 等待服务器检测完成
