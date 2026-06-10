@@ -72,7 +72,7 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 8px;
-      margin: -24px auto 0;
+      margin: 16px auto 0;
       padding: 0 16px;
       max-width: 600px;
       position: relative;
@@ -772,6 +772,7 @@ async function generateQuestion() {
 async function callDeepSeekDirect(apiKey, type) {
   if (type === 'matrix') return callDeepSeekDirectMatrix(apiKey);
   if (type === 'equation') return callDeepSeekDirectEquation(apiKey);
+  if (type === 'inverse') return callDeepSeekDirectInverse(apiKey);
 
   const prompt = `你是一个口算题生成器。请生成一道符合以下全部约束的口算题：
 
@@ -970,9 +971,71 @@ async function callDeepSeekDirectEquation(apiKey) {
   return json;
 }
 
+// 浏览器模式：逆矩阵
+async function callDeepSeekDirectInverse(apiKey) {
+  const prompt = `你是一个矩阵求逆出题器。请生成一道矩阵求逆题。
+
+约束：
+- 生成一个 n×n 方阵 A，其中 n=2 或 n=3
+- 矩阵中的每个数字都是 -5 到 5 之间的整数（不要小数或分数）
+- 矩阵必须可逆（行列式不为零）
+- 逆矩阵的元素可能是分数
+
+请严格按以下 JSON 格式返回，不要包含其他内容：
+{
+  "question": "求矩阵 A 的逆矩阵",
+  "matrixA": [[矩阵的每一行]],
+  "size": 2,
+  "answer": [[逆矩阵的每一行]],
+  "solution": "详细的解题步骤，使用行变换方法 [A|I] → [I|A^(-1)]，每步单独一行"
+}`;
+
+  const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1500,
+    }),
+  });
+
+  if (!res.ok) {
+    return { error: 'API 返回 ' + res.status + '，请检查 API Key' };
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) return { error: 'AI 返回为空' };
+
+  let json;
+  if (content.startsWith('{')) {
+    try { json = JSON.parse(content); } catch (e) {}
+  }
+  if (!json) {
+    const m = content.match(/```(?:json)?\s*\n?(.*?)\n?```/s);
+    if (m) {
+      try { json = JSON.parse(m[1].trim()); } catch (e) {}
+    }
+  }
+  if (!json || !json.matrixA || !json.answer) {
+    return { error: 'AI 返回格式错误，请重试' };
+  }
+  return json;
+}
+
 function renderQuestion() {
   if (!currentQuestion) return;
   const area = document.getElementById('practiceArea');
+
+  if (currentQuestion.questionType === 'inverse') {
+    renderInverseQuestion();
+    return;
+  }
 
   if (currentQuestion.questionType === 'equation' || currentQuestion.equations) {
     renderEquationQuestion();
@@ -1062,8 +1125,9 @@ function renderMatrixInputs(rows, cols) {
 
 function collectMatrixAnswer() {
   const inputs = document.querySelectorAll('.matrix-cell');
-  const rows = currentQuestion.rows || currentQuestion.matrixA.length;
-  const cols = currentQuestion.cols || currentQuestion.matrixB[0].length;
+  const size = currentQuestion.size;
+  const rows = size || currentQuestion.rows || currentQuestion.matrixA.length;
+  const cols = size || currentQuestion.cols || (currentQuestion.matrixB ? currentQuestion.matrixB[0].length : size);
   const result = [];
   for (let i = 0; i < rows; i++) {
     result[i] = [];
@@ -1187,13 +1251,23 @@ function displayMatrixResult(correct, userMatrix, correctMatrix) {
     '</div>';
 }
 
+function parseNumericValue(str) {
+  if (typeof str === 'number') return str;
+  str = str.trim();
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    return parseFloat(parts[0]) / parseFloat(parts[1]);
+  }
+  return parseFloat(str);
+}
+
 function clientVerifyMatrix(userMatrix, correctMatrix) {
   if (!userMatrix || !correctMatrix) return false;
   if (userMatrix.length !== correctMatrix.length) return false;
   for (let i = 0; i < userMatrix.length; i++) {
     if (userMatrix[i].length !== correctMatrix[i].length) return false;
     for (let j = 0; j < userMatrix[i].length; j++) {
-      if (parseInt(userMatrix[i][j]) !== parseInt(correctMatrix[i][j])) return false;
+      if (Math.abs(parseNumericValue(userMatrix[i][j]) - parseNumericValue(correctMatrix[i][j])) > 0.001) return false;
     }
   }
   return true;
@@ -1249,16 +1323,197 @@ function renderEquationSteps(steps) {
     }
     if (step.augmented) {
       html += '<div class="eq-step-arrow">→</div>';
-      html += '<div class="matrix-block">' +
-        '<div class="matrix-label">增广矩阵</div>' +
-        renderAugmentedMatrix(step.augmented.matrix, step.augmented.vector) +
-        '</div>';
+      // 判断右侧是向量（方程组）还是方阵（逆矩阵）
+      const vec = step.augmented.vector;
+      if (vec && Array.isArray(vec) && vec.length > 0 && Array.isArray(vec[0])) {
+        // 右侧是方阵（逆矩阵 [A|I] 格式）
+        html += '<div class="matrix-block">' +
+          '<div class="matrix-label">增广矩阵</div>' +
+          renderAugmentedMatrixSquare(step.augmented.matrix, vec) +
+          '</div>';
+      } else {
+        // 右侧是向量（方程组 [A|b] 格式）
+        html += '<div class="matrix-block">' +
+          '<div class="matrix-label">增广矩阵</div>' +
+          renderAugmentedMatrix(step.augmented.matrix, step.augmented.vector) +
+          '</div>';
+      }
     }
     html += '</div>'; // eq-step-matrices
     html += '</div>'; // eq-step
   }
   html += '</div>';
   return html;
+}
+
+function renderAugmentedMatrixSquare(matrix, rightMatrix) {
+  /* 渲染 [A | B] 格式，左右都是方阵 */
+  if (!matrix || !matrix.length || !rightMatrix) return '';
+  const n = matrix.length;
+  let html = '<div class="matrix-box augmented"><table>';
+  for (let i = 0; i < n; i++) {
+    html += '<tr>';
+    for (let j = 0; j < n; j++) {
+      html += '<td>' + escapeHtml(matrix[i][j]) + '</td>';
+    }
+    html += '<td class="vert-bar"></td>';
+    for (let j = 0; j < n; j++) {
+      html += '<td>' + escapeHtml(rightMatrix[i][j]) + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</table></div>';
+  return html;
+}
+
+// ============================================================
+// 逆矩阵渲染
+// ============================================================
+function renderInverseQuestion() {
+  if (!currentQuestion) return;
+  const q = currentQuestion;
+  const size = q.size || q.matrixA.length;
+
+  let html = '<div class="card matrix-area">';
+  html += '<div class="question-text" style="font-size:22px;">' + escapeHtml(q.question || '求矩阵 A 的逆矩阵') + '</div>';
+
+  // 显示矩阵 A
+  html += '<div class="matrix-row">';
+  html += '<div><div class="matrix-label">A</div>' + renderMatrixTable(q.matrixA) + '</div>';
+  html += '<span class="matrix-op">→</span>';
+  html += '<div><div class="matrix-label">A⁻¹ = ?</div>' + renderMatrixInputs(size, size) + '</div>';
+  html += '</div>';
+
+  html += '<div style="color:#94a3b8;font-size:13px;margin-top:8px;margin-bottom:12px;">在右侧矩阵中填入 A⁻¹ 的每个元素（分数用 a/b 格式）</div>';
+  html += '<div><button class="btn btn-success" id="submitBtn" onclick="submitInverseAnswer()">提交</button></div>';
+  html += '<div id="resultArea"></div>';
+  html += '</div>';
+
+  document.getElementById('practiceArea').innerHTML = html;
+
+  // 聚焦第一个输入框
+  const firstInput = document.querySelector('.matrix-cell');
+  if (firstInput) firstInput.focus();
+}
+
+async function submitInverseAnswer() {
+  if (!currentQuestion || answered) return;
+
+  const userMatrix = collectMatrixAnswer();
+  const size = currentQuestion.size || currentQuestion.matrixA.length;
+
+  // 检查所有格子都已填写
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      if (userMatrix[i][j] === '') {
+        showToast('请填写所有格子');
+        return;
+      }
+    }
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '核验中...';
+
+  let correct = false;
+  let serverAnswer = null;
+
+  if (useServer) {
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionType: 'inverse',
+          matrixA: currentQuestion.matrixA,
+          userAnswer: userMatrix,
+          size: size,
+        }),
+      });
+      const data = await res.json();
+      correct = data.correct;
+    } catch (e) {
+      // 降级到本地验证
+      correct = clientVerifyMatrix(userMatrix, currentQuestion.answer);
+    }
+  } else {
+    correct = clientVerifyMatrix(userMatrix, currentQuestion.answer);
+  }
+
+  answered = true;
+  const elapsedSec = Math.round((Date.now() - questionStartTime) / 1000);
+
+  // 保存记录
+  const records = loadRecords();
+  records.push({
+    id: Date.now() + Math.random(),
+    question: '逆矩阵: ' + JSON.stringify(currentQuestion.matrixA),
+    expression: JSON.stringify({ matrixA: currentQuestion.matrixA }),
+    userAnswer: JSON.stringify(userMatrix),
+    correctAnswer: JSON.stringify(currentQuestion.answer),
+    correct: correct,
+    speedSec: elapsedSec,
+    timestamp: new Date().toISOString(),
+    questionType: 'inverse',
+  });
+  saveRecords(records);
+
+  displayInverseResult(correct, userMatrix, currentQuestion.answer);
+
+  btn.textContent = '已提交';
+  updateStats();
+}
+
+function displayInverseResult(correct, userMatrix, correctMatrix) {
+  const resultArea = document.getElementById('resultArea');
+
+  if (correct) {
+    resultArea.innerHTML =
+      '<div class="result-badge correct">✅ 正确！</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">A⁻¹</div>' + renderMatrixTable(correctMatrix) + '</div>';
+  } else {
+    resultArea.innerHTML =
+      '<div class="result-badge wrong">❌ 错误</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">A⁻¹</div>' + renderMatrixTable(correctMatrix) + '</div>' +
+      '<div style="margin:12px 0;"><div class="matrix-label">你的输入</div>' + renderMatrixTable(userMatrix) + '</div>';
+  }
+
+  // 逐个格子高亮
+  const size = correctMatrix.length;
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size; j++) {
+      const input = document.querySelector('.matrix-cell[data-row="' + i + '"][data-col="' + j + '"]');
+      if (input) {
+        const userVal = input.value.trim();
+        const correctVal = '' + correctMatrix[i][j];
+        if (userVal === correctVal) {
+          input.className = 'matrix-cell correct';
+        } else {
+          input.className = 'matrix-cell wrong';
+        }
+      }
+    }
+  }
+
+  // solution + 下一题
+  let solutionHtml;
+  if (currentQuestion.solutionSteps) {
+    solutionHtml = '<div class="solution-box">' +
+      '<h3>📖 详细解答（行变换求逆 · 含左乘矩阵）</h3>' +
+      renderEquationSteps(currentQuestion.solutionSteps) +
+    '</div>';
+  } else {
+    solutionHtml = '<div class="solution-box">' +
+      '<h3>📖 详细解答（行变换求逆）</h3>' +
+      '<div class="step">' + escapeHtml(currentQuestion.solution || '') + '</div>' +
+    '</div>';
+  }
+  resultArea.innerHTML += solutionHtml +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
+      '<button class="btn btn-primary" onclick="generateQuestion()">继续下一题 →</button>' +
+      '<button class="btn btn-outline" onclick="endPractice()">结束做题</button>' +
+    '</div>';
 }
 
 // ============================================================
@@ -1734,7 +1989,7 @@ function renderDateDetail(list, records, header) {
     return;
   }
 
-  const typeLabels = { mixed: '混合', decimal: '小数', fraction: '分数', matrix: '矩阵', equation: '方程组' };
+  const typeLabels = { mixed: '混合', decimal: '小数', fraction: '分数', matrix: '矩阵', equation: '方程组', inverse: '逆矩阵' };
 
   list.innerHTML = dayRecords.map(function(r) {
     const time = new Date(r.timestamp);
@@ -1836,7 +2091,7 @@ function setQuestionType(type, btn) {
   questionType = type;
   document.querySelectorAll('.type-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
-  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组' };
+  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组', inverse: '逆矩阵' };
   const p = document.querySelector('.question-area p');
   if (p) p.textContent = '点击下方按钮，AI 将为你生成一道' + (labels[type] || '口算题');
 }
@@ -1848,7 +2103,7 @@ function endPractice() {
 }
 
 function showHomeScreen() {
-  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组' };
+  const labels = { mixed: '混合口算', decimal: '小数计算', fraction: '分数计算', matrix: '矩阵乘法', equation: '方程组', inverse: '逆矩阵' };
   const area = document.getElementById('practiceArea');
   area.innerHTML =
     '<div class="card question-area" style="padding:48px 20px;">' +
